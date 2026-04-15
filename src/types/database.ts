@@ -76,3 +76,21 @@ export interface StaffAssignment {
     academic_year: string
     created_at: string
 }
+export interface Discipline {
+    id: string
+    department_id: string
+    name: string
+    education_level: string
+    semester: number
+    total_hours: number
+    lecture_hours: number
+    group_hours: number
+    subgroup_hours: number
+    tsz_hours: number
+    practice_hours: number
+    course_works: number
+    control_works: number
+    exams: number
+    credits: number
+    academic_year: string
+}
