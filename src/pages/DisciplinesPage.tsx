@@ -29,7 +29,7 @@ const emptyForm = {
     control_works: 0,
     exams: 0,
     credits: 0,
-    academic_year: '2026-2027',
+    academic_year: '2025-2026',
     lecture_streams: 1,
     group_count: 1,
     subgroup_count: 1,
