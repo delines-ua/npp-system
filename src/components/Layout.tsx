@@ -6,7 +6,9 @@ export default function Layout() {
         { to: '/departments', label: '🏛 Кафедри' },
         { to: '/staff', label: '👨‍🏫 НПП' },
         { to: '/disciplines', label: '📚 Дисципліни' },
+        { to: '/assignments', label: '📋 Розподіл НПП' },
         { to: '/assistant', label: '🤖 AI Асистент' },
+
     ]
 
     return (

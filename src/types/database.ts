@@ -94,3 +94,14 @@ export interface Discipline {
     credits: number
     academic_year: string
 }
+export interface StaffAssignment {
+    id: string
+    staff_id: string
+    discipline_id: string
+    discipline_name: string
+    planned_hours: number
+    actual_hours: number
+    academic_year: string
+    notes: string
+    created_at: string
+}
