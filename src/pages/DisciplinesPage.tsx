@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDisciplines, createDiscipline, deleteDiscipline } from '../services/disciplines'
 import { getDepartments } from '../services/departments'
 import { calculateWorkload } from '../utils/workload'
-import { BookOpen, Plus, Trash2, X, Save, ChevronDown, ChevronUp } from 'lucide-react'
+import { BookOpen, Plus, Trash2, X, Save, ChevronUp, Filter } from 'lucide-react'
 
 const EDUCATION_LEVELS = [
     '1_Бакалавр (очна)', '2_Бакалавр (заочна)', '3_Магістр (очна)',
@@ -44,11 +44,25 @@ const labelStyle = {
     marginBottom: '6px',
 }
 
+const selectStyle = {
+    padding: '8px 12px',
+    background: 'rgba(15,23,42,0.8)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    fontSize: '13px',
+    color: '#e2e8f0',
+    outline: 'none',
+}
+
 export default function DisciplinesPage() {
     const queryClient = useQueryClient()
     const [showForm, setShowForm] = useState(false)
     const [form, setForm] = useState(emptyForm)
     const [filterDept, setFilterDept] = useState('')
+    const [filterLevel, setFilterLevel] = useState('')
+    const [filterForm, setFilterForm] = useState('')
+    const [filterSemester, setFilterSemester] = useState('')
+    const [showFilters, setShowFilters] = useState(false)
 
     const { data: disciplines, isLoading } = useQuery({
         queryKey: ['disciplines', filterDept],
@@ -102,30 +116,56 @@ export default function DisciplinesPage() {
         subgroup_count: form.subgroup_count, student_count: form.student_count,
     })
 
+    // Фільтрація
+    const filteredDisciplines = disciplines?.filter(d => {
+        if (filterLevel && !d.education_level.includes(filterLevel)) return false
+        if (filterForm === 'ochna' && d.education_level.includes('заочна')) return false
+        if (filterForm === 'zaochna' && !d.education_level.includes('заочна')) return false
+        if (filterSemester && d.semester !== Number(filterSemester)) return false
+        return true
+    }) || []
+
+    const activeFilters = [filterLevel, filterForm, filterSemester].filter(Boolean).length
+
     if (isLoading) return (
         <div style={{ textAlign: 'center', color: '#475569', padding: '80px' }}>Завантаження...</div>
     )
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                 <div>
                     <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#f1f5f9', marginBottom: '4px' }}>
                         Дисципліни
                     </h1>
                     <p style={{ fontSize: '14px', color: '#475569' }}>
-                        Навчальні дисципліни та розрахунок навантаження
+                        Знайдено: {filteredDisciplines.length} з {disciplines?.length || 0}
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <select
-                        style={{ ...inputStyle, width: 'auto', padding: '10px 14px' }}
-                        value={filterDept}
-                        onChange={e => setFilterDept(e.target.value)}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        style={{
+                            padding: '10px 16px',
+                            background: activeFilters > 0 ? 'rgba(37,99,235,0.2)' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${activeFilters > 0 ? 'rgba(37,99,235,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            color: activeFilters > 0 ? '#60a5fa' : '#9ca3af',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                        }}
                     >
-                        <option value="">Всі кафедри</option>
-                        {departments?.map(d => <option key={d.id} value={d.id}>Кафедра № {d.number}</option>)}
-                    </select>
+                        <Filter size={15} />
+                        Фільтри
+                        {activeFilters > 0 && (
+                            <span style={{ background: '#2563eb', color: '#fff', borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '700' }}>
+                {activeFilters}
+              </span>
+                        )}
+                    </button>
                     <button
                         onClick={() => setShowForm(!showForm)}
                         style={{ padding: '10px 20px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -136,12 +176,63 @@ export default function DisciplinesPage() {
                 </div>
             </div>
 
+            {/* Фільтри */}
+            {showFilters && (
+                <div style={{ ...card, padding: '20px', marginBottom: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                        <div>
+                            <label style={labelStyle}>Кафедра</label>
+                            <select style={selectStyle} value={filterDept} onChange={e => setFilterDept(e.target.value)}>
+                                <option value="">Всі кафедри</option>
+                                {departments?.map(d => <option key={d.id} value={d.id}>№ {d.number} — {d.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Рівень підготовки</label>
+                            <select style={selectStyle} value={filterLevel} onChange={e => setFilterLevel(e.target.value)}>
+                                <option value="">Всі рівні</option>
+                                <option value="Бакалавр">Бакалавр</option>
+                                <option value="Магістр">Магістр</option>
+                                <option value="Доктор філософії">Доктор філософії</option>
+                                <option value="загальновійськова">Загальновійськова</option>
+                                <option value="Курси">Курси</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Форма навчання</label>
+                            <select style={selectStyle} value={filterForm} onChange={e => setFilterForm(e.target.value)}>
+                                <option value="">Всі форми</option>
+                                <option value="ochna">Очна</option>
+                                <option value="zaochna">Заочна</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Семестр</label>
+                            <select style={selectStyle} value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
+                                <option value="">Всі семестри</option>
+                                {[1,2,3,4,5,6,7,8,9,10].map(s => (
+                                    <option key={s} value={s}>Семестр {s}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    {activeFilters > 0 && (
+                        <button
+                            onClick={() => { setFilterLevel(''); setFilterForm(''); setFilterSemester(''); setFilterDept('') }}
+                            style={{ marginTop: '12px', padding: '6px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#f87171' }}
+                        >
+                            Скинути фільтри
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* Форма додавання */}
             {showForm && (
                 <div style={{ ...card, padding: '24px', marginBottom: '24px' }}>
                     <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', marginBottom: '20px' }}>
                         Нова дисципліна
                     </h3>
-
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                         <div style={{ gridColumn: '1 / -1' }}>
                             <label style={labelStyle}>Назва дисципліни</label>
@@ -192,16 +283,9 @@ export default function DisciplinesPage() {
                         {numInput('subgroup_count', 'Підгруп')}
                     </div>
 
-                    {/* Розрахунок */}
-                    <div style={{
-                        background: 'rgba(15,23,42,0.6)',
-                        border: '1px solid rgba(59,130,246,0.2)',
-                        borderRadius: '12px',
-                        padding: '20px',
-                        marginBottom: '20px',
-                    }}>
+                    <div style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
                         <p style={{ fontWeight: '600', fontSize: '13px', color: '#60a5fa', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            Розрахунок навантаження · Наказ №155/291 · Табл. 3
+                            Розрахунок · Наказ №155/291 · Табл. 3
                         </p>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
                             {[
@@ -251,16 +335,21 @@ export default function DisciplinesPage() {
                 </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {disciplines?.length === 0 && (
+            {/* Список дисциплін */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {filteredDisciplines.length === 0 && (
                     <div style={{ ...card, padding: '64px', textAlign: 'center', color: '#374151' }}>
                         <BookOpen size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-                        <div style={{ fontSize: '15px' }}>Дисциплін ще немає</div>
-                        <div style={{ fontSize: '13px', marginTop: '4px' }}>Додайте першу дисципліну</div>
+                        <div style={{ fontSize: '15px' }}>
+                            {disciplines?.length === 0 ? 'Дисциплін ще немає' : 'Нічого не знайдено'}
+                        </div>
+                        <div style={{ fontSize: '13px', marginTop: '4px' }}>
+                            {disciplines?.length === 0 ? 'Додайте першу дисципліну' : 'Спробуйте змінити фільтри'}
+                        </div>
                     </div>
                 )}
 
-                {disciplines?.map(d => {
+                {filteredDisciplines.map(d => {
                     const dept = departments?.find(dep => dep.id === d.department_id)
                     const calc = calculateWorkload({
                         lecture_hours: d.lecture_hours, group_hours: d.group_hours,
@@ -270,30 +359,36 @@ export default function DisciplinesPage() {
                         lecture_streams: 1, group_count: 1, subgroup_count: 1, student_count: 25,
                     })
 
+                    const isZaochna = d.education_level.includes('заочна')
+                    const levelColor = d.education_level.includes('Магістр') ? '#8b5cf6'
+                        : d.education_level.includes('Доктор') ? '#ef4444'
+                            : d.education_level.includes('Курси') ? '#f59e0b'
+                                : isZaochna ? '#06b6d4' : '#3b82f6'
+
                     return (
-                        <div key={d.id} style={{ ...card, padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                <div style={{ width: '42px', height: '42px', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <BookOpen size={20} color="#f59e0b" />
-                                </div>
-                                <div>
-                                    <div style={{ fontWeight: '600', fontSize: '15px', color: '#f1f5f9' }}>{d.name}</div>
-                                    <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
-                                        {d.education_level.replace(/^\d+_/, '')} · Семестр {d.semester} · Каф. № {dept?.number} · {d.academic_year}
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '16px', marginTop: '4px' }}>
-                                        <span style={{ fontSize: '12px', color: '#475569' }}>Лекції: <strong style={{ color: '#94a3b8' }}>{d.lecture_hours}</strong></span>
-                                        <span style={{ fontSize: '12px', color: '#475569' }}>Групові: <strong style={{ color: '#94a3b8' }}>{d.group_hours}</strong></span>
-                                        <span style={{ fontSize: '12px', color: '#475569' }}>Підгрупові: <strong style={{ color: '#94a3b8' }}>{d.subgroup_hours}</strong></span>
-                                        <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600' }}>Навантаження: {calc.total_hours} год</span>
+                        <div key={d.id} style={{ ...card, padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1 }}>
+                                <div style={{ width: '4px', height: '40px', borderRadius: '2px', background: levelColor, flexShrink: 0 }} />
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#f1f5f9' }}>{d.name}</div>
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '4px', background: `${levelColor}20`, color: levelColor, fontWeight: '500' }}>
+                      {d.education_level.replace(/^\d+_/, '')}
+                    </span>
+                                        <span style={{ fontSize: '12px', color: '#475569' }}>Сем. {d.semester}</span>
+                                        <span style={{ fontSize: '12px', color: '#475569' }}>Каф. №{dept?.number}</span>
+                                        <span style={{ fontSize: '12px', color: '#475569' }}>Лек: {d.lecture_hours}</span>
+                                        <span style={{ fontSize: '12px', color: '#475569' }}>Груп: {d.group_hours}</span>
+                                        <span style={{ fontSize: '12px', color: '#475569' }}>Підгр: {d.subgroup_hours}</span>
+                                        <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600' }}>{calc.total_hours} год</span>
                                     </div>
                                 </div>
                             </div>
                             <button
                                 onClick={() => deleteMutation.mutate(d.id)}
-                                style={{ padding: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center' }}
+                                style={{ padding: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '12px' }}
                             >
-                                <Trash2 size={16} />
+                                <Trash2 size={15} />
                             </button>
                         </div>
                     )
