@@ -6,7 +6,8 @@ import DepartmentsPage from './pages/DepartmentsPage'
 import StaffPage from './pages/StaffPage'
 import DisciplinesPage from './pages/DisciplinesPage'
 import AssistantPage from './pages/AssistantPage'
-import AssignmentsPage from "./pages/AssignmentsPage.tsx";
+import ImportPage from './pages/ImportPage'
+import AssignmentsPage from "./pages/AssignmentsPage.tsx"
 
 const queryClient = new QueryClient()
 
@@ -23,6 +24,7 @@ function App() {
               <Route path="disciplines" element={<DisciplinesPage />} />
               <Route path="assistant" element={<AssistantPage />} />
                 <Route path="assignments" element={<AssignmentsPage />} />
+              <Route path="import" element={<ImportPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

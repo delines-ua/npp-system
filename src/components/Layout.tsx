@@ -1,7 +1,8 @@
 import { Outlet, NavLink } from 'react-router-dom'
+import { Upload } from 'lucide-react'
 import {
     LayoutDashboard, Building2, Users, BookOpen,
-    ClipboardList, Bot, ChevronRight
+    ClipboardList, Bot, ChevronRight,
 } from 'lucide-react'
 
 const links = [
@@ -11,6 +12,7 @@ const links = [
     { to: '/disciplines', label: 'Дисципліни', icon: BookOpen },
     { to: '/assignments', label: 'Розподіл НПП', icon: ClipboardList },
     { to: '/assistant', label: 'AI Асистент', icon: Bot },
+    { to: '/import', label: 'Імпорт Excel', icon: Upload },
 ]
 
 export default function Layout() {
