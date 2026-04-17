@@ -5,7 +5,8 @@ import { getStaff } from '../services/staff'
 import { getDisciplines } from '../services/disciplines'
 import { getAssignments } from '../services/assignments'
 import { calculateWorkload, getStaffHourLimit } from '../utils/workload'
-import { Building2, Users, BookOpen, TrendingUp, AlertTriangle, CheckCircle, BarChart3, Table2 } from 'lucide-react'
+import { exportInstitutePDF } from '../utils/reports'
+import { Building2, Users, BookOpen, TrendingUp, AlertTriangle, CheckCircle, BarChart3, Table2, FileDown } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
     PieChart, Pie, Cell, ResponsiveContainer, Legend
@@ -19,6 +20,36 @@ const card = {
     borderRadius: '16px',
     backdropFilter: 'blur(10px)',
 }
+
+const ViewToggle = ({ view, setView }: { view: 'chart' | 'table', setView: (v: 'chart' | 'table') => void }) => (
+    <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '3px', gap: '2px' }}>
+        {[
+            { v: 'chart', icon: BarChart3, label: 'Графік' },
+            { v: 'table', icon: Table2, label: 'Таблиця' },
+        ].map(({ v, icon: Icon, label }) => (
+            <button
+                key={v}
+                onClick={() => setView(v as 'chart' | 'table')}
+                style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: view === v ? 'rgba(37,99,235,0.3)' : 'transparent',
+                    color: view === v ? '#60a5fa' : '#6b7280',
+                    transition: 'all 0.2s',
+                }}
+            >
+                <Icon size={14} /> {label}
+            </button>
+        ))}
+    </div>
+)
 
 export default function DashboardPage() {
     const [workloadView, setWorkloadView] = useState<'chart' | 'table'>('chart')
@@ -40,7 +71,6 @@ export default function DashboardPage() {
     const totalWorkload = disciplines?.reduce((sum, d) => sum + getDiscWorkload(d), 0) || 0
     const requiredStaff = Math.round((totalWorkload / 600) * 10) / 10
 
-    // Дані по кафедрах
     const deptData = departments?.map(dept => {
         const deptDisc = disciplines?.filter(d => d.department_id === dept.id) || []
         const planned = Math.round(deptDisc.reduce((sum, d) => sum + getDiscWorkload(d), 0))
@@ -63,7 +93,6 @@ export default function DashboardPage() {
         }
     }) || []
 
-    // Дані по НПП
     const staffData = staff?.map(s => {
         const limit = getStaffHourLimit(s.rate, s.is_military, s.service_years)
         const staffAssignments = assignments?.filter(a => a.staff_id === s.id) || []
@@ -115,48 +144,46 @@ export default function DashboardPage() {
         )
     }
 
-    const ViewToggle = ({ view, setView }: { view: 'chart' | 'table', setView: (v: 'chart' | 'table') => void }) => (
-        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '3px', gap: '2px' }}>
-            {[
-                { v: 'chart', icon: BarChart3, label: 'Графік' },
-                { v: 'table', icon: Table2, label: 'Таблиця' },
-            ].map(({ v, icon: Icon, label }) => (
+    return (
+        <div>
+            {/* Заголовок */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
+                <div>
+                    <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#f1f5f9', marginBottom: '4px' }}>
+                        Дашборд
+                    </h1>
+                    <p style={{ fontSize: '14px', color: '#475569' }}>
+                        2025-2026 навчальний рік · ВІТІ імені Героїв Крут
+                    </p>
+                </div>
                 <button
-                    key={v}
-                    onClick={() => setView(v as 'chart' | 'table')}
+                    onClick={() => exportInstitutePDF(
+                        departments || [], staff || [], disciplines || [], assignments || [],
+                        getDiscWorkload, getStaffHourLimit
+                    )}
                     style={{
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        border: 'none',
+                        padding: '10px 20px',
+                        background: 'rgba(239,68,68,0.15)',
+                        border: '1px solid rgba(239,68,68,0.3)',
+                        borderRadius: '8px',
                         cursor: 'pointer',
-                        fontSize: '12px',
+                        fontSize: '14px',
                         fontWeight: '500',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        background: view === v ? 'rgba(37,99,235,0.3)' : 'transparent',
-                        color: view === v ? '#60a5fa' : '#6b7280',
-                        transition: 'all 0.2s',
+                        gap: '8px',
+                        color: '#f87171',
                     }}
                 >
-                    <Icon size={14} /> {label}
+                    <FileDown size={16} /> Експорт PDF
                 </button>
-            ))}
-        </div>
-    )
-
-    return (
-        <div>
-            <div style={{ marginBottom: '28px' }}>
-                <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#f1f5f9', marginBottom: '4px' }}>Дашборд</h1>
-                <p style={{ fontSize: '14px', color: '#475569' }}>2025-2026 навчальний рік · ВІТІ імені Героїв Крут</p>
             </div>
 
             {/* Stat cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
                 {stats.map(({ label, value, icon: Icon, color, bg, border, sub }) => (
                     <div key={label} style={{ ...card, border: `1px solid ${border}`, background: bg }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div>
                                 <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>{label}</div>
                                 <div style={{ fontSize: '34px', fontWeight: '700', color, lineHeight: 1 }}>{value}</div>
@@ -170,7 +197,7 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            {/* Навантаження по кафедрах — план vs факт */}
+            {/* Навантаження по кафедрах */}
             <div style={{ ...card, padding: '24px', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <div>
@@ -264,7 +291,7 @@ export default function DashboardPage() {
                                 <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
                                 <Tooltip content={customTooltip} />
                                 <Legend wrapperStyle={{ fontSize: '13px', color: '#94a3b8' }} />
-                                <Bar dataKey="limit" name="Ліміт" fill="rgba(107,114,128,0.3)" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="limit" name="Ліміт" fill="rgba(107,114,128,0.4)" radius={[4, 4, 0, 0]} />
                                 <Bar dataKey="planned" name="Планове" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                                 <Bar dataKey="actual" name="Фактичне" fill="#22c55e" radius={[4, 4, 0, 0]} />
                             </BarChart>
@@ -296,7 +323,9 @@ export default function DashboardPage() {
                                             <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', minWidth: '60px' }}>
                                                 <div style={{ height: '4px', width: `${Math.min(s.percent, 100)}%`, background: s.isOver ? '#ef4444' : s.percent > 80 ? '#f59e0b' : '#22c55e', borderRadius: '2px' }} />
                                             </div>
-                                            <span style={{ fontSize: '12px', color: s.isOver ? '#f87171' : '#94a3b8', minWidth: '36px' }}>{s.percent}%</span>
+                                            <span style={{ fontSize: '12px', color: s.isOver ? '#f87171' : '#94a3b8', minWidth: '36px' }}>
+                          {s.percent}%
+                        </span>
                                         </div>
                                     </td>
                                     <td style={{ padding: '12px' }}>
@@ -317,8 +346,6 @@ export default function DashboardPage() {
 
             {/* Нижній ряд */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-
-                {/* Види підготовки */}
                 <div style={card}>
                     <div style={{ padding: '24px' }}>
                         <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', marginBottom: '20px' }}>
@@ -340,7 +367,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Статус кафедр */}
                 <div style={card}>
                     <div style={{ padding: '24px' }}>
                         <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', marginBottom: '20px' }}>
@@ -362,7 +388,9 @@ export default function DashboardPage() {
                                 </div>
                             ))}
                             {deptData.length === 0 && (
-                                <div style={{ textAlign: 'center', color: '#374151', padding: '24px', fontSize: '14px' }}>Немає даних</div>
+                                <div style={{ textAlign: 'center', color: '#374151', padding: '24px', fontSize: '14px' }}>
+                                    Немає даних
+                                </div>
                             )}
                         </div>
                     </div>

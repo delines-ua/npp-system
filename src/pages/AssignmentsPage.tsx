@@ -5,7 +5,8 @@ import { getStaff } from '../services/staff'
 import { getDisciplines } from '../services/disciplines'
 import { getAssignments, createAssignment, deleteAssignment, getStaffWorkloadSummary, updateActualHours } from '../services/assignments'
 import { calculateWorkload, getStaffHourLimit } from '../utils/workload'
-import { ClipboardList, UserCheck, BookOpen, AlertTriangle, CheckCircle } from 'lucide-react'
+import { exportDepartmentExcel } from '../utils/reports'
+import { ClipboardList, UserCheck, BookOpen, AlertTriangle, CheckCircle, FileDown } from 'lucide-react'
 
 const card = {
     background: 'rgba(30,41,59,0.8)',
@@ -109,6 +110,18 @@ export default function AssignmentsPage() {
         queryClient.invalidateQueries({ queryKey: ['workload-summary'] })
     }
 
+    const handleExcelExport = () => {
+        const dept = departments?.find(d => d.id === selectedDept)
+        exportDepartmentExcel(
+            dept?.name || '',
+            dept?.number || '',
+            staff || [],
+            assignments || [],
+            departments || [],
+            getStaffHourLimit
+        )
+    }
+
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
@@ -120,32 +133,57 @@ export default function AssignmentsPage() {
                         Призначення дисциплін між НПП · {academicYear} навч. рік
                     </p>
                 </div>
-                <select
-                    value={selectedDept}
-                    onChange={e => setSelectedDept(e.target.value)}
-                    style={{
-                        padding: '10px 14px',
-                        background: 'rgba(15,23,42,0.8)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        color: '#e2e8f0',
-                        outline: 'none',
-                        minWidth: '260px',
-                    }}
-                >
-                    <option value="">Оберіть кафедру</option>
-                    {departments?.map(d => (
-                        <option key={d.id} value={d.id}>
-                            Кафедра № {d.number} — {d.name}
-                        </option>
-                    ))}
-                </select>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <select
+                        value={selectedDept}
+                        onChange={e => setSelectedDept(e.target.value)}
+                        style={{
+                            padding: '10px 14px',
+                            background: 'rgba(15,23,42,0.8)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            color: '#e2e8f0',
+                            outline: 'none',
+                            minWidth: '260px',
+                        }}
+                    >
+                        <option value="">Оберіть кафедру</option>
+                        {departments?.map(d => (
+                            <option key={d.id} value={d.id}>
+                                Кафедра № {d.number} — {d.name}
+                            </option>
+                        ))}
+                    </select>
+
+                    {selectedDept && (
+                        <button
+                            onClick={handleExcelExport}
+                            style={{
+                                padding: '10px 16px',
+                                background: 'rgba(34,197,94,0.15)',
+                                border: '1px solid rgba(34,197,94,0.3)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                color: '#4ade80',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            <FileDown size={16} /> Excel
+                        </button>
+                    )}
+                </div>
             </div>
 
             {!selectedDept && (
-                <div style={{ ...card, padding: '80px', textAlign: 'center', color: '#374151' }}>
-                    <ClipboardList size={56} style={{ margin: '0 auto 16px', opacity: 0.2 }} />
+                <div style={{ ...card, padding: '80px', textAlign: 'center' }}>
+                    <ClipboardList size={56} style={{ margin: '0 auto 16px', opacity: 0.2, color: '#4b5563' }} />
                     <div style={{ fontSize: '16px', color: '#4b5563' }}>Оберіть кафедру</div>
                     <div style={{ fontSize: '13px', color: '#374151', marginTop: '4px' }}>
                         для розподілу навантаження між НПП
@@ -186,7 +224,6 @@ export default function AssignmentsPage() {
                                                 ? 'rgba(245,158,11,0.2)'
                                                 : 'rgba(255,255,255,0.06)'}`,
                                     }}>
-                                        {/* Заголовок НПП */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                             <div>
                                                 <div style={{ fontWeight: '600', fontSize: '14px', color: '#f1f5f9' }}>
@@ -204,7 +241,6 @@ export default function AssignmentsPage() {
                                             </div>
                                         </div>
 
-                                        {/* Прогрес бар */}
                                         <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '4px', height: '4px', marginBottom: '12px', overflow: 'hidden' }}>
                                             <div style={{
                                                 height: '4px',
@@ -215,7 +251,6 @@ export default function AssignmentsPage() {
                                             }} />
                                         </div>
 
-                                        {/* Факт підсумок */}
                                         {staffAssignments.length > 0 && (
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
                                                 <span style={{ fontSize: '11px', color: '#475569' }}>Фактично виконано:</span>
@@ -225,7 +260,6 @@ export default function AssignmentsPage() {
                                             </div>
                                         )}
 
-                                        {/* Дисципліни НПП */}
                                         {staffAssignments.length > 0 && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                 {staffAssignments.map(a => (
