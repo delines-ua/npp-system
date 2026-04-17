@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDepartments } from '../services/departments'
 import { getStaff } from '../services/staff'
 import { getDisciplines } from '../services/disciplines'
-import { getAssignments, createAssignment, deleteAssignment, getStaffWorkloadSummary } from '../services/assignments'
+import { getAssignments, createAssignment, deleteAssignment, getStaffWorkloadSummary, updateActualHours } from '../services/assignments'
 import { calculateWorkload, getStaffHourLimit } from '../utils/workload'
 import { ClipboardList, UserCheck, BookOpen, AlertTriangle, CheckCircle } from 'lucide-react'
 
@@ -19,11 +19,34 @@ export default function AssignmentsPage() {
     const [selectedDept, setSelectedDept] = useState('')
     const academicYear = '2025-2026'
 
-    const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: getDepartments })
-    const { data: staff } = useQuery({ queryKey: ['staff', selectedDept], queryFn: () => getStaff(selectedDept || undefined), enabled: !!selectedDept })
-    const { data: disciplines } = useQuery({ queryKey: ['disciplines', selectedDept], queryFn: () => getDisciplines(selectedDept || undefined), enabled: !!selectedDept })
-    const { data: assignments } = useQuery({ queryKey: ['assignments', selectedDept], queryFn: () => getAssignments(selectedDept || undefined), enabled: !!selectedDept })
-    const { data: workloadSummary } = useQuery({ queryKey: ['workload-summary', selectedDept], queryFn: () => getStaffWorkloadSummary(selectedDept, academicYear), enabled: !!selectedDept })
+    const { data: departments } = useQuery({
+        queryKey: ['departments'],
+        queryFn: getDepartments,
+    })
+
+    const { data: staff } = useQuery({
+        queryKey: ['staff', selectedDept],
+        queryFn: () => getStaff(selectedDept || undefined),
+        enabled: !!selectedDept,
+    })
+
+    const { data: disciplines } = useQuery({
+        queryKey: ['disciplines', selectedDept],
+        queryFn: () => getDisciplines(selectedDept || undefined),
+        enabled: !!selectedDept,
+    })
+
+    const { data: assignments } = useQuery({
+        queryKey: ['assignments', selectedDept],
+        queryFn: () => getAssignments(selectedDept || undefined),
+        enabled: !!selectedDept,
+    })
+
+    const { data: workloadSummary } = useQuery({
+        queryKey: ['workload-summary', selectedDept],
+        queryFn: () => getStaffWorkloadSummary(selectedDept, academicYear),
+        enabled: !!selectedDept,
+    })
 
     const createMutation = useMutation({
         mutationFn: createAssignment,
@@ -48,11 +71,18 @@ export default function AssignmentsPage() {
         const disc = disciplines?.find(d => d.id === disciplineId)
         if (!disc) return 0
         return calculateWorkload({
-            lecture_hours: disc.lecture_hours, group_hours: disc.group_hours,
-            subgroup_hours: disc.subgroup_hours, practice_hours: disc.practice_hours,
-            course_works: disc.course_works, control_works: disc.control_works,
-            exams: disc.exams, credits: disc.credits,
-            lecture_streams: 1, group_count: 1, subgroup_count: 1, student_count: 25,
+            lecture_hours: disc.lecture_hours,
+            group_hours: disc.group_hours,
+            subgroup_hours: disc.subgroup_hours,
+            practice_hours: disc.practice_hours,
+            course_works: disc.course_works,
+            control_works: disc.control_works,
+            exams: disc.exams,
+            credits: disc.credits,
+            lecture_streams: 1,
+            group_count: 1,
+            subgroup_count: 1,
+            student_count: 25,
         }).total_hours
     }
 
@@ -73,6 +103,12 @@ export default function AssignmentsPage() {
     const isAssigned = (staffId: string, disciplineId: string) =>
         assignments?.some(a => a.staff_id === staffId && a.discipline_id === disciplineId)
 
+    const handleActualUpdate = async (id: string, value: number) => {
+        await updateActualHours(id, value)
+        queryClient.invalidateQueries({ queryKey: ['assignments'] })
+        queryClient.invalidateQueries({ queryKey: ['workload-summary'] })
+    }
+
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
@@ -87,10 +123,23 @@ export default function AssignmentsPage() {
                 <select
                     value={selectedDept}
                     onChange={e => setSelectedDept(e.target.value)}
-                    style={{ padding: '10px 14px', background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '14px', color: '#e2e8f0', outline: 'none', minWidth: '260px' }}
+                    style={{
+                        padding: '10px 14px',
+                        background: 'rgba(15,23,42,0.8)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        color: '#e2e8f0',
+                        outline: 'none',
+                        minWidth: '260px',
+                    }}
                 >
                     <option value="">Оберіть кафедру</option>
-                    {departments?.map(d => <option key={d.id} value={d.id}>Кафедра № {d.number} — {d.name}</option>)}
+                    {departments?.map(d => (
+                        <option key={d.id} value={d.id}>
+                            Кафедра № {d.number} — {d.name}
+                        </option>
+                    ))}
                 </select>
             </div>
 
@@ -98,7 +147,9 @@ export default function AssignmentsPage() {
                 <div style={{ ...card, padding: '80px', textAlign: 'center', color: '#374151' }}>
                     <ClipboardList size={56} style={{ margin: '0 auto 16px', opacity: 0.2 }} />
                     <div style={{ fontSize: '16px', color: '#4b5563' }}>Оберіть кафедру</div>
-                    <div style={{ fontSize: '13px', color: '#374151', marginTop: '4px' }}>для розподілу навантаження між НПП</div>
+                    <div style={{ fontSize: '13px', color: '#374151', marginTop: '4px' }}>
+                        для розподілу навантаження між НПП
+                    </div>
                 </div>
             )}
 
@@ -107,9 +158,14 @@ export default function AssignmentsPage() {
 
                     {/* НПП */}
                     <div>
-                        <h2 style={{ fontSize: '14px', fontWeight: '600', color: '#94a3b8', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h2 style={{
+                            fontSize: '14px', fontWeight: '600', color: '#94a3b8',
+                            marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px',
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                        }}>
                             <UserCheck size={16} /> НПП кафедри
                         </h2>
+
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {staff?.map(s => {
                                 const limit = getStaffHourLimit(s.rate, s.is_military, s.service_years)
@@ -118,23 +174,33 @@ export default function AssignmentsPage() {
                                 const isOver = used > limit
                                 const isWarning = percent > 80 && !isOver
                                 const staffAssignments = assignments?.filter(a => a.staff_id === s.id) || []
+                                const actualTotal = staffAssignments.reduce((sum, a) => sum + (a.actual_hours || 0), 0)
 
                                 return (
                                     <div key={s.id} style={{
                                         ...card,
                                         padding: '16px 20px',
-                                        border: `1px solid ${isOver ? 'rgba(239,68,68,0.3)' : isWarning ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                                        border: `1px solid ${isOver
+                                            ? 'rgba(239,68,68,0.3)'
+                                            : isWarning
+                                                ? 'rgba(245,158,11,0.2)'
+                                                : 'rgba(255,255,255,0.06)'}`,
                                     }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                        {/* Заголовок НПП */}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                             <div>
-                                                <div style={{ fontWeight: '600', fontSize: '14px', color: '#f1f5f9' }}>{s.full_name}</div>
-                                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{s.position} · {s.rate} ставки</div>
+                                                <div style={{ fontWeight: '600', fontSize: '14px', color: '#f1f5f9' }}>
+                                                    {s.full_name}
+                                                </div>
+                                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                                                    {s.position} · {s.rate} ставки
+                                                </div>
                                             </div>
                                             <div style={{ textAlign: 'right' }}>
                                                 <div style={{ fontSize: '13px', fontWeight: '700', color: isOver ? '#ef4444' : isWarning ? '#f59e0b' : '#22c55e' }}>
-                                                    {used} / {limit}
+                                                    {used} / {limit} год
                                                 </div>
-                                                <div style={{ fontSize: '11px', color: '#6b7280' }}>год · {percent}%</div>
+                                                <div style={{ fontSize: '11px', color: '#6b7280' }}>{percent}% плану</div>
                                             </div>
                                         </div>
 
@@ -149,17 +215,65 @@ export default function AssignmentsPage() {
                                             }} />
                                         </div>
 
-                                        {/* Призначені дисципліни */}
+                                        {/* Факт підсумок */}
+                                        {staffAssignments.length > 0 && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                                                <span style={{ fontSize: '11px', color: '#475569' }}>Фактично виконано:</span>
+                                                <span style={{ fontSize: '12px', color: '#4ade80', fontWeight: '600' }}>
+                          {actualTotal} год
+                        </span>
+                                            </div>
+                                        )}
+
+                                        {/* Дисципліни НПП */}
                                         {staffAssignments.length > 0 && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                 {staffAssignments.map(a => (
-                                                    <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                                                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>{a.discipline_name}</span>
-                                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                            <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600' }}>{a.planned_hours} год</span>
+                                                    <div key={a.id} style={{
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        padding: '6px 10px',
+                                                        background: 'rgba(255,255,255,0.03)',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid rgba(255,255,255,0.04)',
+                                                    }}>
+                            <span style={{ fontSize: '12px', color: '#94a3b8', flex: 1, marginRight: '8px' }}>
+                              {a.discipline_name}
+                            </span>
+                                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                                                            <span style={{ fontSize: '11px', color: '#475569' }}>план:</span>
+                                                            <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600', minWidth: '28px' }}>
+                                {a.planned_hours}
+                              </span>
+                                                            <span style={{ fontSize: '11px', color: '#475569' }}>факт:</span>
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                defaultValue={a.actual_hours || 0}
+                                                                onBlur={e => handleActualUpdate(a.id, Number(e.target.value))}
+                                                                style={{
+                                                                    width: '52px',
+                                                                    padding: '2px 6px',
+                                                                    background: 'rgba(34,197,94,0.1)',
+                                                                    border: '1px solid rgba(34,197,94,0.25)',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '12px',
+                                                                    color: '#4ade80',
+                                                                    outline: 'none',
+                                                                }}
+                                                            />
                                                             <button
                                                                 onClick={() => deleteMutation.mutate(a.id)}
-                                                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: '0 2px' }}
+                                                                style={{
+                                                                    background: 'none',
+                                                                    border: 'none',
+                                                                    color: '#ef4444',
+                                                                    cursor: 'pointer',
+                                                                    fontSize: '16px',
+                                                                    lineHeight: 1,
+                                                                    padding: '0 2px',
+                                                                }}
                                                             >×</button>
                                                         </div>
                                                     </div>
@@ -192,9 +306,14 @@ export default function AssignmentsPage() {
 
                     {/* Дисципліни */}
                     <div>
-                        <h2 style={{ fontSize: '14px', fontWeight: '600', color: '#94a3b8', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h2 style={{
+                            fontSize: '14px', fontWeight: '600', color: '#94a3b8',
+                            marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px',
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                        }}>
                             <BookOpen size={16} /> Дисципліни кафедри
                         </h2>
+
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {disciplines?.map(disc => {
                                 const workload = getDiscWorkload(disc.id)
@@ -205,16 +324,20 @@ export default function AssignmentsPage() {
                                     <div key={disc.id} style={{
                                         ...card,
                                         padding: '16px 20px',
-                                        border: `1px solid ${fullyAssigned ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)'}`,
+                                        border: `1px solid ${fullyAssigned
+                                            ? 'rgba(34,197,94,0.15)'
+                                            : 'rgba(255,255,255,0.06)'}`,
                                     }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                                            <div>
-                                                <div style={{ fontWeight: '600', fontSize: '14px', color: '#f1f5f9' }}>{disc.name}</div>
+                                            <div style={{ flex: 1, marginRight: '12px' }}>
+                                                <div style={{ fontWeight: '600', fontSize: '14px', color: '#f1f5f9' }}>
+                                                    {disc.name}
+                                                </div>
                                                 <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
                                                     {disc.education_level.replace(/^\d+_/, '')} · Сем. {disc.semester}
                                                 </div>
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                                 {fullyAssigned && <CheckCircle size={14} color="#22c55e" />}
                                                 <span style={{ fontSize: '13px', fontWeight: '700', color: '#3b82f6' }}>
                           {workload} год

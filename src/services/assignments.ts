@@ -79,5 +79,17 @@ export const getStaffWorkloadSummary = async (
         summary[row.staff_id].total_planned += row.planned_hours
         summary[row.staff_id].total_actual += row.actual_hours
     }
+
     return Object.entries(summary).map(([staff_id, v]) => ({ staff_id, ...v }))
+
+}
+export const updateActualHours = async (
+    id: string,
+    actual_hours: number
+): Promise<void> => {
+    const { error } = await supabase
+        .from('staff_assignments')
+        .update({ actual_hours })
+        .eq('id', id)
+    if (error) throw error
 }
