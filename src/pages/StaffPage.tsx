@@ -2,18 +2,39 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getStaff, createStaff, deleteStaff } from '../services/staff'
 import { getDepartments } from '../services/departments'
+import { Users, Plus, Trash2, X, Save, Shield, User } from 'lucide-react'
+import { getStaffHourLimit } from '../utils/workload'
 
 const POSITIONS = [
-    'Начальник кафедри',
-    'Заступник начальника кафедри',
-    'Професор',
-    'Доцент',
-    'Старший викладач',
-    'Викладач',
-    'Асистент',
+    'Начальник кафедри', 'Заступник начальника кафедри',
+    'Професор', 'Доцент', 'Старший викладач', 'Викладач', 'Асистент',
 ]
-
 const RATES = [0.2, 0.25, 0.5, 0.75, 1.0, 1.5]
+
+const card = {
+    background: 'rgba(30,41,59,0.8)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: '16px',
+    backdropFilter: 'blur(10px)',
+}
+
+const inputStyle = {
+    padding: '10px 14px',
+    background: 'rgba(15,23,42,0.8)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    fontSize: '14px',
+    color: '#e2e8f0',
+    outline: 'none',
+    width: '100%',
+}
+
+const label = {
+    display: 'block' as const,
+    fontSize: '12px',
+    color: '#6b7280',
+    marginBottom: '6px',
+}
 
 export default function StaffPage() {
     const queryClient = useQueryClient()
@@ -51,82 +72,67 @@ export default function StaffPage() {
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['staff'] }),
     })
 
-    const getHourLimit = (rate: number, is_military: boolean, service_years: number) => {
-        if (!is_military) return Math.round(1548 * rate)
-        let base = 1840
-        if (service_years >= 20) base = 1720
-        else if (service_years >= 15) base = 1760
-        else if (service_years >= 10) base = 1800
-        return Math.round(base * rate)
-    }
-
-    const inputStyle = {
-        padding: '8px 12px',
-        border: '1px solid #e2e8f0',
-        borderRadius: '6px',
-        fontSize: '14px',
-        width: '100%',
-    }
-
-    const labelStyle = {
-        display: 'block' as const,
-        fontSize: '13px',
-        color: '#64748b',
-        marginBottom: '4px',
-    }
-
-    if (isLoading) return <p>Завантаження...</p>
+    if (isLoading) return (
+        <div style={{ textAlign: 'center', color: '#475569', padding: '80px' }}>Завантаження...</div>
+    )
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <h1 style={{ margin: 0, fontSize: '24px', color: '#1e293b' }}>НПП</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
+                <div>
+                    <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#f1f5f9', marginBottom: '4px' }}>
+                        Науково-педагогічні працівники
+                    </h1>
+                    <p style={{ fontSize: '14px', color: '#475569' }}>
+                        Облік НПП та лімітів навчального навантаження
+                    </p>
+                </div>
                 <button
                     onClick={() => setShowForm(!showForm)}
-                    style={{ padding: '10px 20px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}
+                    style={{ padding: '10px 20px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                    + Додати НПП
+                    <Plus size={16} /> Додати НПП
                 </button>
             </div>
 
             {showForm && (
-                <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                    <h3 style={{ margin: '0 0 16px', fontSize: '16px' }}>Новий науково-педагогічний працівник</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div style={{ ...card, padding: '24px', marginBottom: '24px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', marginBottom: '20px' }}>
+                        Новий науково-педагогічний працівник
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                         <div style={{ gridColumn: '1 / -1' }}>
-                            <label style={labelStyle}>ПІБ</label>
+                            <label style={label}>ПІБ</label>
                             <input style={inputStyle} value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="Прізвище Ім'я По батькові" />
                         </div>
                         <div>
-                            <label style={labelStyle}>Кафедра</label>
+                            <label style={label}>Кафедра</label>
                             <select style={inputStyle} value={form.department_id} onChange={e => setForm({ ...form, department_id: e.target.value })}>
                                 <option value="">Оберіть кафедру</option>
-                                {departments?.map(d => (
-                                    <option key={d.id} value={d.id}>№ {d.number} — {d.name}</option>
-                                ))}
+                                {departments?.map(d => <option key={d.id} value={d.id}>№ {d.number} — {d.name}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label style={labelStyle}>Посада</label>
+                            <label style={label}>Посада</label>
                             <select style={inputStyle} value={form.position} onChange={e => setForm({ ...form, position: e.target.value })}>
                                 {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label style={labelStyle}>Ставка</label>
+                            <label style={label}>Ставка</label>
                             <select style={inputStyle} value={form.rate} onChange={e => setForm({ ...form, rate: Number(e.target.value) })}>
                                 {RATES.map(r => <option key={r} value={r}>{r} ставки</option>)}
                             </select>
                         </div>
                         <div>
-                            <label style={labelStyle}>Тип</label>
+                            <label style={label}>Тип</label>
                             <select style={inputStyle} value={form.is_military ? 'true' : 'false'} onChange={e => setForm({ ...form, is_military: e.target.value === 'true' })}>
                                 <option value="true">Військовослужбовець</option>
                                 <option value="false">Цивільний працівник</option>
                             </select>
                         </div>
                         <div>
-                            <label style={labelStyle}>Вислуга (років)</label>
+                            <label style={label}>Вислуга (років)</label>
                             <input style={inputStyle} type="number" value={form.service_years} onChange={e => setForm({ ...form, service_years: Number(e.target.value) })} min={0} />
                         </div>
                     </div>
@@ -134,15 +140,16 @@ export default function StaffPage() {
                         <button
                             onClick={() => createMutation.mutate()}
                             disabled={!form.full_name || !form.department_id || createMutation.isPending}
-                            style={{ padding: '8px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}
+                            style={{ padding: '10px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
+                            <Save size={16} />
                             {createMutation.isPending ? 'Збереження...' : 'Зберегти'}
                         </button>
                         <button
                             onClick={() => setShowForm(false)}
-                            style={{ padding: '8px 16px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}
+                            style={{ padding: '10px 16px', background: '#374151', color: '#9ca3af', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
-                            Скасувати
+                            <X size={16} /> Скасувати
                         </button>
                     </div>
                 </div>
@@ -150,29 +157,49 @@ export default function StaffPage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {staff?.length === 0 && (
-                    <div style={{ background: '#fff', padding: '48px', borderRadius: '12px', textAlign: 'center', color: '#94a3b8' }}>
-                        НПП ще немає. Додайте першого працівника.
+                    <div style={{ ...card, padding: '64px', textAlign: 'center', color: '#374151' }}>
+                        <Users size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
+                        <div style={{ fontSize: '15px' }}>НПП ще немає</div>
+                        <div style={{ fontSize: '13px', marginTop: '4px' }}>Додайте першого працівника</div>
                     </div>
                 )}
+
                 {staff?.map(s => {
                     const dept = departments?.find(d => d.id === s.department_id)
-                    const limit = getHourLimit(s.rate, s.is_military, s.service_years)
+                    const limit = getStaffHourLimit(s.rate, s.is_military, s.service_years)
+
                     return (
-                        <div key={s.id} style={{ background: '#fff', padding: '16px 20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <div style={{ fontWeight: '600', fontSize: '15px', color: '#1e293b' }}>{s.full_name}</div>
-                                <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-                                    {s.position} · Кафедра № {dept?.number} · {s.rate} ставки · {s.is_military ? `вислуга ${s.service_years} р.` : 'цивільний'}
+                        <div key={s.id} style={{ ...card, padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <div style={{
+                                    width: '42px', height: '42px',
+                                    background: s.is_military ? 'rgba(37,99,235,0.15)' : 'rgba(107,114,128,0.15)',
+                                    border: `1px solid ${s.is_military ? 'rgba(37,99,235,0.2)' : 'rgba(107,114,128,0.2)'}`,
+                                    borderRadius: '10px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}>
+                                    {s.is_military
+                                        ? <Shield size={20} color="#3b82f6" />
+                                        : <User size={20} color="#6b7280" />
+                                    }
                                 </div>
-                                <div style={{ fontSize: '13px', color: '#3b82f6', marginTop: '2px' }}>
-                                    Ліміт: {limit} год/рік
+                                <div>
+                                    <div style={{ fontWeight: '600', fontSize: '15px', color: '#f1f5f9' }}>
+                                        {s.full_name}
+                                    </div>
+                                    <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
+                                        {s.position} · Кафедра № {dept?.number} · {s.rate} ставки · {s.is_military ? `вислуга ${s.service_years} р.` : 'цивільний'}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#3b82f6', marginTop: '4px', fontWeight: '500' }}>
+                                        Ліміт навантаження: {limit} год/рік
+                                    </div>
                                 </div>
                             </div>
                             <button
                                 onClick={() => deleteMutation.mutate(s.id)}
-                                style={{ padding: '6px 12px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                                style={{ padding: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center' }}
                             >
-                                Видалити
+                                <Trash2 size={16} />
                             </button>
                         </div>
                     )
