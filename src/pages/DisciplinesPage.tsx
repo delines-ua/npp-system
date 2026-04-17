@@ -17,6 +17,7 @@ const emptyForm = {
     subgroup_hours: 0, tsz_hours: 0, practice_hours: 0, course_works: 0,
     control_works: 0, exams: 0, credits: 0, academic_year: '2025-2026',
     lecture_streams: 1, group_count: 1, subgroup_count: 1, student_count: 0,
+
 }
 
 const card = {
@@ -76,13 +77,25 @@ export default function DisciplinesPage() {
 
     const createMutation = useMutation({
         mutationFn: () => createDiscipline({
-            department_id: form.department_id, name: form.name,
-            education_level: form.education_level, semester: form.semester,
-            total_hours: form.total_hours, lecture_hours: form.lecture_hours,
-            group_hours: form.group_hours, subgroup_hours: form.subgroup_hours,
-            tsz_hours: form.tsz_hours, practice_hours: form.practice_hours,
-            course_works: form.course_works, control_works: form.control_works,
-            exams: form.exams, credits: form.credits, academic_year: form.academic_year,
+            department_id: form.department_id,
+            name: form.name,
+            education_level: form.education_level,
+            semester: form.semester,
+            total_hours: form.total_hours,
+            lecture_hours: form.lecture_hours,
+            group_hours: form.group_hours,
+            subgroup_hours: form.subgroup_hours,
+            tsz_hours: form.tsz_hours,
+            practice_hours: form.practice_hours,
+            course_works: form.course_works,
+            control_works: form.control_works,
+            exams: form.exams,
+            credits: form.credits,
+            academic_year: form.academic_year,
+            student_count: form.student_count,
+            lecture_streams: form.lecture_streams,
+            group_count: form.group_count,
+            subgroup_count: form.subgroup_count,
         }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['disciplines'] })

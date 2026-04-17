@@ -42,6 +42,7 @@ export const calculateWorkload = (input: WorkloadInput): WorkloadResult => {
         Math.round((input.lecture_hours * 0.15 * input.lecture_streams +
             input.group_hours * 0.1 * input.group_count) * 10) / 10
 
+
     // Граф 18: перевірка контрольних робіт (0.5 год × к-сть × студенти)
     const control_work_hours =
         Math.round(input.control_works * 0.5 * input.student_count * 10) / 10
@@ -50,9 +51,9 @@ export const calculateWorkload = (input: WorkloadInput): WorkloadResult => {
     const exam_hours =
         Math.round(input.exams * 0.5 * input.student_count * 10) / 10
 
-    // Граф 17: курсові роботи (6 год × к-сть студентів)
+// Граф 17: курсові роботи (6 год × к-сть студентів що пишуть)
     const course_work_hours =
-        Math.round(input.course_works * 6 * input.student_count * 10) / 10
+        Math.round(input.course_works * 6 * 10) / 10
 
     // Граф 19: заліки (0.33 год × студенти × заліки)
     const credit_hours =

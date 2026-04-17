@@ -60,13 +60,18 @@ export default function DashboardPage() {
     const { data: disciplines } = useQuery({ queryKey: ['disciplines'], queryFn: () => getDisciplines() })
     const { data: assignments } = useQuery({ queryKey: ['assignments'], queryFn: () => getAssignments() })
 
-    const getDiscWorkload = (d: any) => calculateWorkload({
-        lecture_hours: d.lecture_hours, group_hours: d.group_hours,
-        subgroup_hours: d.subgroup_hours, practice_hours: d.practice_hours,
-        course_works: d.course_works, control_works: d.control_works,
-        exams: d.exams, credits: d.credits,
-        lecture_streams: 1, group_count: 1, subgroup_count: 1, student_count: 25,
-    }).total_hours
+    const getDiscWorkload = (d: any) => {
+        // Використовуємо total_hours з навчального плану якщо є
+        if (d.total_hours && d.total_hours > 0) return d.total_hours
+        // Інакше рахуємо по формулі
+        return calculateWorkload({
+            lecture_hours: d.lecture_hours, group_hours: d.group_hours,
+            subgroup_hours: d.subgroup_hours, practice_hours: d.practice_hours,
+            course_works: d.course_works, control_works: d.control_works,
+            exams: d.exams, credits: d.credits,
+            lecture_streams: 1, group_count: 1, subgroup_count: 1, student_count: 25,
+        }).total_hours
+    }
 
     const totalWorkload = disciplines?.reduce((sum, d) => sum + getDiscWorkload(d), 0) || 0
     const requiredStaff = Math.round((totalWorkload / 600) * 10) / 10

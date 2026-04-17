@@ -93,6 +93,10 @@ export interface Discipline {
     exams: number
     credits: number
     academic_year: string
+    student_count: number
+    lecture_streams: number
+    group_count: number
+    subgroup_count: number
 }
 export interface StaffAssignment {
     id: string

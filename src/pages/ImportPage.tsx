@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import { getDepartments } from '../services/departments'
 import { createDiscipline } from '../services/disciplines'
-import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, X, Play } from 'lucide-react'
+import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Play } from 'lucide-react'
 
 const card = {
     background: 'rgba(30,41,59,0.8)',
@@ -25,6 +25,10 @@ interface ParsedDiscipline {
     exams: number
     credits: number
     total_hours: number
+    student_count: number
+    lecture_streams: number
+    group_count: number
+    subgroup_count: number
     status: 'ready' | 'error' | 'imported'
     error?: string
 }
@@ -49,18 +53,23 @@ export default function ImportPage() {
     const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-
         setFileName(file.name)
         setParsed([])
         setImportDone(false)
 
         const reader = new FileReader()
-        reader.onload = (evt) => {
+        reader.onload = evt => {
             const data = new Uint8Array(evt.target?.result as ArrayBuffer)
             const wb = XLSX.read(data, { type: 'array' })
             setWorkbook(wb)
-            setSheetNames(wb.SheetNames)
-            setSelectedSheet(wb.SheetNames[0])
+
+            // Фільтруємо тільки аркуші кафедр (числові назви)
+            const deptSheets = wb.SheetNames.filter(n =>
+                /^\d+$/.test(n.trim()) &&
+                !['1', '2', '3'].includes(n.trim())
+            )
+            setSheetNames(deptSheets.length > 0 ? deptSheets : wb.SheetNames)
+            setSelectedSheet(deptSheets[0] || wb.SheetNames[0])
             setStep(2)
         }
         reader.readAsArrayBuffer(file)
@@ -70,41 +79,64 @@ export default function ImportPage() {
         if (!workbook || !selectedSheet) return
 
         const ws = workbook.Sheets[selectedSheet]
-        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: 0 })
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null })
 
-        // Знаходимо рядок заголовків (рядок 1 — індекс 1)
         const results: ParsedDiscipline[] = []
+        let currentLevel = '1_Бакалавр (очна)'
 
         for (let i = 3; i < rows.length; i++) {
             const row = rows[i]
-            if (!row || !row[2]) continue
+            if (!row) continue
 
-            const name = String(row[2] || '').trim()
-            if (!name || name === '0') continue
+            // Оновлюємо вид підготовки
+            if (row[0] && String(row[0]).trim().length > 3) {
+                const levelRaw = String(row[0]).trim().toLowerCase()
+                if (levelRaw.includes('заочна')) currentLevel = '2_Бакалавр (заочна)'
+                else if (levelRaw.includes('магістр')) currentLevel = '3_Магістр (очна)'
+                else if (levelRaw.includes('філософії')) currentLevel = '4_Доктор філософії'
+                else if (levelRaw.includes('загально')) currentLevel = '5_Базова загальновійськова підготовка'
+                else if (levelRaw.includes('курси')) currentLevel = '7_Курси підвищення кваліфікації'
+                else if (levelRaw.includes('бакалавр') && !levelRaw.includes('заочна')) currentLevel = '1_Бакалавр (очна)'
+            }
 
-            // Визначаємо вид підготовки з колонки 0
-            const levelRaw = String(rows[i][0] || rows[i - 1]?.[0] || '').trim()
-            let education_level = '1_Бакалавр (очна)'
-            if (levelRaw.includes('заочна')) education_level = '2_Бакалавр (заочна)'
-            else if (levelRaw.includes('Магістр')) education_level = '3_Магістр (очна)'
-            else if (levelRaw.includes('філософії')) education_level = '4_Доктор філософії'
-            else if (levelRaw.includes('загально')) education_level = '5_Базова загальновійськова підготовка'
-            else if (levelRaw.includes('курси') || levelRaw.includes('Курси')) education_level = '7_Курси підвищення кваліфікації'
+            // Назва — колонка 2, номер — колонка 1
+            const name = row[2] ? String(row[2]).trim() : ''
+            const num = row[1]
+            if (!name || !num || typeof num !== 'number') continue
+
+            // Пропускаємо підсумкові рядки
+            const nameLower = name.toLowerCase()
+            if (nameLower.includes('всього') || nameLower.includes('разом') ||
+                nameLower.includes('итого') || nameLower.includes('у тому числі') ||
+                nameLower.includes('начальник')) continue
 
             const semester = Number(row[4]) || 1
-            const total_hours = Number(row[5]) || 0
+            const total_hours_plan = Number(row[5]) || 0
             const lecture_hours = Number(row[7]) || 0
             const group_hours = Number(row[8]) || 0
             const subgroup_hours = Number(row[9]) || 0
-            const practice_hours = Number(row[10]) || 0
-            const course_works = Number(row[11]) || 0
-            const control_works = Number(row[12]) || 0
+            const practice_hours = Number(row[11]) || 0
+            const course_works_raw = Number(row[12]) || 0
+            const course_works = course_works_raw > 50 ? 0 : course_works_raw
+            const control_works = Number(row[13]) || 0
             const exams = Number(row[16]) || 0
             const credits = Number(row[17]) || 0
+            const student_count = Number(row[21]) || 0
+            const lecture_streams = Number(row[22]) || 1
+            const group_count = Number(row[23]) || 1
+            const subgroup_count = Number(row[24]) || 1
+
+            // Колонка 77 — готовий розрахований час по наказу
+            const calculated_total = Number(row[77]) || 0
+            const total_hours = Math.max(
+                calculated_total > 0 ? calculated_total : 0,
+                total_hours_plan > 0 ? total_hours_plan : 0
+            )
+            if (total_hours === 0 && total_hours_plan === 0) continue
 
             results.push({
                 name,
-                education_level,
+                education_level: currentLevel,
                 semester,
                 lecture_hours,
                 group_hours,
@@ -115,8 +147,11 @@ export default function ImportPage() {
                 exams,
                 credits,
                 total_hours,
-                status: name.length > 2 ? 'ready' : 'error',
-                error: name.length <= 2 ? 'Некоректна назва' : undefined,
+                student_count,
+                lecture_streams,
+                group_count,
+                subgroup_count,
+                status: 'ready',
             })
         }
 
@@ -148,9 +183,13 @@ export default function ImportPage() {
                     exams: updated[i].exams,
                     credits: updated[i].credits,
                     academic_year: '2025-2026',
+                    student_count: updated[i].student_count,
+                    lecture_streams: updated[i].lecture_streams,
+                    group_count: updated[i].group_count,
+                    subgroup_count: updated[i].subgroup_count,
                 })
                 updated[i] = { ...updated[i], status: 'imported' }
-            } catch (e) {
+            } catch {
                 updated[i] = { ...updated[i], status: 'error', error: 'Помилка збереження' }
             }
             setParsed([...updated])
@@ -171,7 +210,7 @@ export default function ImportPage() {
                     Імпорт Excel
                 </h1>
                 <p style={{ fontSize: '14px', color: '#475569' }}>
-                    Завантаження дисциплін з файлу розрахунку НПП
+                    Завантаження дисциплін з файлу розрахунку НПП · Наказ №155/291
                 </p>
             </div>
 
@@ -206,16 +245,13 @@ export default function ImportPage() {
                 ))}
             </div>
 
-            {/* Крок 1: завантажити файл */}
+            {/* Крок 1 */}
             <div style={{ ...card, padding: '32px', marginBottom: '20px' }}>
                 <div
                     onClick={() => fileRef.current?.click()}
                     style={{
                         border: `2px dashed ${fileName ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                        borderRadius: '12px',
-                        padding: '48px',
-                        textAlign: 'center',
-                        cursor: 'pointer',
+                        borderRadius: '12px', padding: '48px', textAlign: 'center', cursor: 'pointer',
                         background: fileName ? 'rgba(34,197,94,0.05)' : 'rgba(255,255,255,0.02)',
                         transition: 'all 0.2s',
                     }}
@@ -224,12 +260,8 @@ export default function ImportPage() {
                     {fileName ? (
                         <>
                             <FileSpreadsheet size={48} color="#22c55e" style={{ margin: '0 auto 16px' }} />
-                            <div style={{ fontWeight: '600', fontSize: '16px', color: '#4ade80', marginBottom: '4px' }}>
-                                {fileName}
-                            </div>
-                            <div style={{ fontSize: '13px', color: '#6b7280' }}>
-                                Натисніть щоб змінити файл
-                            </div>
+                            <div style={{ fontWeight: '600', fontSize: '16px', color: '#4ade80', marginBottom: '4px' }}>{fileName}</div>
+                            <div style={{ fontSize: '13px', color: '#6b7280' }}>Натисніть щоб змінити файл</div>
                         </>
                     ) : (
                         <>
@@ -238,38 +270,37 @@ export default function ImportPage() {
                                 Перетягніть файл або натисніть для вибору
                             </div>
                             <div style={{ fontSize: '13px', color: '#475569' }}>
-                                Підтримуються файли .xlsx та .xls (Розрахунок НПП ВІТІ)
+                                Підтримується формат Розрахунку НПП ВІТІ (.xlsx)
                             </div>
                         </>
                     )}
                 </div>
             </div>
 
-            {/* Крок 2: обрати аркуш */}
+            {/* Крок 2 */}
             {step >= 2 && sheetNames.length > 0 && (
                 <div style={{ ...card, padding: '24px', marginBottom: '20px' }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', marginBottom: '8px' }}>
                         Оберіть аркуш кафедри
                     </h3>
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                    <p style={{ fontSize: '13px', color: '#475569', marginBottom: '16px' }}>
+                        Аркуші пронумеровані по номеру кафедри (11, 12, 21, 22 тощо)
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
                         {sheetNames.map(name => (
                             <button
                                 key={name}
                                 onClick={() => setSelectedSheet(name)}
                                 style={{
-                                    padding: '8px 16px',
-                                    borderRadius: '8px',
-                                    fontSize: '13px',
-                                    fontWeight: '500',
-                                    border: '1px solid',
-                                    cursor: 'pointer',
+                                    padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '500',
+                                    border: '1px solid', cursor: 'pointer',
                                     background: selectedSheet === name ? 'rgba(37,99,235,0.2)' : 'rgba(255,255,255,0.03)',
                                     borderColor: selectedSheet === name ? 'rgba(37,99,235,0.4)' : 'rgba(255,255,255,0.08)',
                                     color: selectedSheet === name ? '#60a5fa' : '#94a3b8',
                                     transition: 'all 0.2s',
                                 }}
                             >
-                                {name}
+                                Каф. №{name}
                             </button>
                         ))}
                     </div>
@@ -277,7 +308,7 @@ export default function ImportPage() {
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
                         <div style={{ flex: 1 }}>
                             <label style={{ display: 'block', fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>
-                                Кафедра для імпорту
+                                Прив'язати до кафедри в системі
                             </label>
                             <select
                                 value={selectedDept}
@@ -299,7 +330,7 @@ export default function ImportPage() {
                 </div>
             )}
 
-            {/* Крок 3: preview і імпорт */}
+            {/* Крок 3 */}
             {step >= 3 && parsed.length > 0 && (
                 <div style={{ ...card, padding: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -313,7 +344,7 @@ export default function ImportPage() {
                                 {errorCount > 0 && <span style={{ color: '#f87171' }}>✗ Помилки: {errorCount}</span>}
                             </div>
                         </div>
-                        {!importDone && (
+                        {!importDone ? (
                             <button
                                 onClick={handleImport}
                                 disabled={importing || readyCount === 0}
@@ -322,51 +353,44 @@ export default function ImportPage() {
                                 <Upload size={16} />
                                 {importing ? 'Імпортування...' : `Імпортувати ${readyCount} дисциплін`}
                             </button>
-                        )}
-                        {importDone && (
+                        ) : (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4ade80', fontWeight: '600', fontSize: '14px' }}>
                                 <CheckCircle size={18} /> Імпорт завершено!
                             </div>
                         )}
                     </div>
 
-                    {/* Список */}
-                    <div style={{ maxHeight: '400px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {/* Превью */}
+                    <div style={{ maxHeight: '500px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         {parsed.map((disc, i) => (
                             <div key={i} style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                padding: '10px 14px',
-                                borderRadius: '8px',
-                                background: disc.status === 'imported'
-                                    ? 'rgba(34,197,94,0.06)'
-                                    : disc.status === 'error'
-                                        ? 'rgba(239,68,68,0.06)'
-                                        : 'rgba(255,255,255,0.02)',
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                padding: '10px 14px', borderRadius: '8px',
+                                background: disc.status === 'imported' ? 'rgba(34,197,94,0.06)' : disc.status === 'error' ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.02)',
                                 border: `1px solid ${disc.status === 'imported' ? 'rgba(34,197,94,0.15)' : disc.status === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}`,
                             }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
                                     {disc.status === 'imported'
-                                        ? <CheckCircle size={15} color="#22c55e" />
+                                        ? <CheckCircle size={14} color="#22c55e" />
                                         : disc.status === 'error'
-                                            ? <AlertTriangle size={15} color="#ef4444" />
-                                            : <div style={{ width: '15px', height: '15px', borderRadius: '50%', border: '2px solid #3b82f6' }} />
+                                            ? <AlertTriangle size={14} color="#ef4444" />
+                                            : <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '2px solid #3b82f6', flexShrink: 0 }} />
                                     }
-                                    <div>
+                                    <div style={{ flex: 1 }}>
                                         <div style={{ fontSize: '13px', color: '#e2e8f0', fontWeight: '500' }}>{disc.name}</div>
                                         <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>
-                                            {disc.education_level.replace(/^\d+_/, '')} · Сем. {disc.semester} · Лек: {disc.lecture_hours} · Груп: {disc.group_hours}
+                                            {disc.education_level.replace(/^\d+_/, '')} · Сем. {disc.semester} ·
+                                            {disc.student_count > 0 && ` ${disc.student_count} курс. ·`}
+                                            {disc.group_count > 0 && ` ${disc.group_count} гр. ·`}
+                                            {' '}Лек: {disc.lecture_hours} · Груп: {disc.group_hours}
                                         </div>
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                   <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600' }}>
                     {disc.total_hours} год
                   </span>
-                                    {disc.error && (
-                                        <span style={{ fontSize: '11px', color: '#f87171' }}>{disc.error}</span>
-                                    )}
+                                    {disc.error && <span style={{ fontSize: '11px', color: '#f87171' }}>{disc.error}</span>}
                                 </div>
                             </div>
                         ))}
