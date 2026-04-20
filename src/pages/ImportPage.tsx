@@ -6,10 +6,10 @@ import { createDiscipline } from '../services/disciplines'
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Play } from 'lucide-react'
 
 const card = {
-    background: 'rgba(30,41,59,0.8)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
     borderRadius: '16px',
-    backdropFilter: 'blur(10px)',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
 }
 
 interface ParsedDiscipline {
@@ -63,10 +63,8 @@ export default function ImportPage() {
             const wb = XLSX.read(data, { type: 'array' })
             setWorkbook(wb)
 
-            // Фільтруємо тільки аркуші кафедр (числові назви)
             const deptSheets = wb.SheetNames.filter(n =>
-                /^\d+$/.test(n.trim()) &&
-                !['1', '2', '3'].includes(n.trim())
+                /^\d+$/.test(n.trim()) && !['1', '2', '3'].includes(n.trim())
             )
             setSheetNames(deptSheets.length > 0 ? deptSheets : wb.SheetNames)
             setSelectedSheet(deptSheets[0] || wb.SheetNames[0])
@@ -88,7 +86,6 @@ export default function ImportPage() {
             const row = rows[i]
             if (!row) continue
 
-            // Оновлюємо вид підготовки
             if (row[0] && String(row[0]).trim().length > 3) {
                 const levelRaw = String(row[0]).trim().toLowerCase()
                 if (levelRaw.includes('заочна')) currentLevel = '2_Бакалавр (заочна)'
@@ -99,12 +96,10 @@ export default function ImportPage() {
                 else if (levelRaw.includes('бакалавр') && !levelRaw.includes('заочна')) currentLevel = '1_Бакалавр (очна)'
             }
 
-            // Назва — колонка 2, номер — колонка 1
             const name = row[2] ? String(row[2]).trim() : ''
             const num = row[1]
             if (!name || !num || typeof num !== 'number') continue
 
-            // Пропускаємо підсумкові рядки
             const nameLower = name.toLowerCase()
             if (nameLower.includes('всього') || nameLower.includes('разом') ||
                 nameLower.includes('итого') || nameLower.includes('у тому числі') ||
@@ -126,7 +121,6 @@ export default function ImportPage() {
             const group_count = Number(row[23]) || 1
             const subgroup_count = Number(row[24]) || 1
 
-            // Колонка 77 — готовий розрахований час по наказу
             const calculated_total = Number(row[77]) || 0
             const total_hours = Math.max(
                 calculated_total > 0 ? calculated_total : 0,
@@ -135,22 +129,10 @@ export default function ImportPage() {
             if (total_hours === 0 && total_hours_plan === 0) continue
 
             results.push({
-                name,
-                education_level: currentLevel,
-                semester,
-                lecture_hours,
-                group_hours,
-                subgroup_hours,
-                practice_hours,
-                course_works,
-                control_works,
-                exams,
-                credits,
-                total_hours,
-                student_count,
-                lecture_streams,
-                group_count,
-                subgroup_count,
+                name, education_level: currentLevel, semester,
+                lecture_hours, group_hours, subgroup_hours, practice_hours,
+                course_works, control_works, exams, credits, total_hours,
+                student_count, lecture_streams, group_count, subgroup_count,
                 status: 'ready',
             })
         }
@@ -168,24 +150,15 @@ export default function ImportPage() {
             if (updated[i].status !== 'ready') continue
             try {
                 await createDiscipline({
-                    department_id: selectedDept,
-                    name: updated[i].name,
-                    education_level: updated[i].education_level,
-                    semester: updated[i].semester,
-                    total_hours: updated[i].total_hours,
-                    lecture_hours: updated[i].lecture_hours,
-                    group_hours: updated[i].group_hours,
-                    subgroup_hours: updated[i].subgroup_hours,
-                    tsz_hours: 0,
-                    practice_hours: updated[i].practice_hours,
-                    course_works: updated[i].course_works,
-                    control_works: updated[i].control_works,
-                    exams: updated[i].exams,
-                    credits: updated[i].credits,
-                    academic_year: '2025-2026',
-                    student_count: updated[i].student_count,
-                    lecture_streams: updated[i].lecture_streams,
-                    group_count: updated[i].group_count,
+                    department_id: selectedDept, name: updated[i].name,
+                    education_level: updated[i].education_level, semester: updated[i].semester,
+                    total_hours: updated[i].total_hours, lecture_hours: updated[i].lecture_hours,
+                    group_hours: updated[i].group_hours, subgroup_hours: updated[i].subgroup_hours,
+                    tsz_hours: 0, practice_hours: updated[i].practice_hours,
+                    course_works: updated[i].course_works, control_works: updated[i].control_works,
+                    exams: updated[i].exams, credits: updated[i].credits,
+                    academic_year: '2025-2026', student_count: updated[i].student_count,
+                    lecture_streams: updated[i].lecture_streams, group_count: updated[i].group_count,
                     subgroup_count: updated[i].subgroup_count,
                 })
                 updated[i] = { ...updated[i], status: 'imported' }
@@ -205,17 +178,17 @@ export default function ImportPage() {
 
     return (
         <div>
-            <div style={{ marginBottom: '28px' }}>
-                <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#f1f5f9', marginBottom: '4px' }}>
+            <div style={{ marginBottom: '24px' }}>
+                <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>
                     Імпорт Excel
                 </h1>
-                <p style={{ fontSize: '14px', color: '#475569' }}>
+                <p style={{ fontSize: '14px', color: '#6b7280' }}>
                     Завантаження дисциплін з файлу розрахунку НПП · Наказ №155/291
                 </p>
             </div>
 
             {/* Кроки */}
-            <div style={{ display: 'flex', gap: '0', marginBottom: '28px' }}>
+            <div style={{ display: 'flex', gap: '0', marginBottom: '24px' }}>
                 {[
                     { n: 1, label: 'Завантажити файл' },
                     { n: 2, label: 'Обрати аркуш' },
@@ -225,51 +198,51 @@ export default function ImportPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <div style={{
                                 width: '32px', height: '32px', borderRadius: '50%',
-                                background: step >= n ? '#2563eb' : 'rgba(255,255,255,0.05)',
-                                border: `2px solid ${step >= n ? '#2563eb' : 'rgba(255,255,255,0.1)'}`,
+                                background: step >= n ? '#f97316' : '#f3f4f6',
+                                border: `2px solid ${step >= n ? '#f97316' : '#e5e7eb'}`,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 fontSize: '13px', fontWeight: '700',
-                                color: step >= n ? '#fff' : '#475569',
+                                color: step >= n ? '#fff' : '#9ca3af',
                                 transition: 'all 0.3s',
                             }}>
                                 {step > n ? <CheckCircle size={16} /> : n}
                             </div>
-                            <span style={{ fontSize: '13px', color: step >= n ? '#e2e8f0' : '#475569', fontWeight: step === n ? '600' : '400' }}>
-                {label}
-              </span>
+                            <span style={{ fontSize: '13px', color: step >= n ? '#111827' : '#9ca3af', fontWeight: step === n ? '600' : '400' }}>
+                                {label}
+                            </span>
                         </div>
                         {idx < 2 && (
-                            <div style={{ flex: 1, height: '1px', background: step > n ? '#2563eb' : 'rgba(255,255,255,0.06)', margin: '0 16px', transition: 'all 0.3s' }} />
+                            <div style={{ flex: 1, height: '2px', background: step > n ? '#f97316' : '#e5e7eb', margin: '0 16px', transition: 'all 0.3s', borderRadius: '1px' }} />
                         )}
                     </div>
                 ))}
             </div>
 
             {/* Крок 1 */}
-            <div style={{ ...card, padding: '32px', marginBottom: '20px' }}>
+            <div style={{ ...card, padding: '32px', marginBottom: '16px' }}>
                 <div
                     onClick={() => fileRef.current?.click()}
                     style={{
-                        border: `2px dashed ${fileName ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                        border: `2px dashed ${fileName ? '#bbf7d0' : '#e5e7eb'}`,
                         borderRadius: '12px', padding: '48px', textAlign: 'center', cursor: 'pointer',
-                        background: fileName ? 'rgba(34,197,94,0.05)' : 'rgba(255,255,255,0.02)',
+                        background: fileName ? '#f0fdf4' : '#fafafa',
                         transition: 'all 0.2s',
                     }}
                 >
                     <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} style={{ display: 'none' }} />
                     {fileName ? (
                         <>
-                            <FileSpreadsheet size={48} color="#22c55e" style={{ margin: '0 auto 16px' }} />
-                            <div style={{ fontWeight: '600', fontSize: '16px', color: '#4ade80', marginBottom: '4px' }}>{fileName}</div>
-                            <div style={{ fontSize: '13px', color: '#6b7280' }}>Натисніть щоб змінити файл</div>
+                            <FileSpreadsheet size={48} color="#16a34a" style={{ margin: '0 auto 16px' }} />
+                            <div style={{ fontWeight: '600', fontSize: '16px', color: '#16a34a', marginBottom: '4px' }}>{fileName}</div>
+                            <div style={{ fontSize: '13px', color: '#9ca3af' }}>Натисніть щоб змінити файл</div>
                         </>
                     ) : (
                         <>
-                            <Upload size={48} color="#475569" style={{ margin: '0 auto 16px' }} />
-                            <div style={{ fontWeight: '600', fontSize: '16px', color: '#94a3b8', marginBottom: '8px' }}>
+                            <Upload size={48} color="#d1d5db" style={{ margin: '0 auto 16px' }} />
+                            <div style={{ fontWeight: '600', fontSize: '16px', color: '#374151', marginBottom: '8px' }}>
                                 Перетягніть файл або натисніть для вибору
                             </div>
-                            <div style={{ fontSize: '13px', color: '#475569' }}>
+                            <div style={{ fontSize: '13px', color: '#9ca3af' }}>
                                 Підтримується формат Розрахунку НПП ВІТІ (.xlsx)
                             </div>
                         </>
@@ -279,11 +252,11 @@ export default function ImportPage() {
 
             {/* Крок 2 */}
             {step >= 2 && sheetNames.length > 0 && (
-                <div style={{ ...card, padding: '24px', marginBottom: '20px' }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', marginBottom: '8px' }}>
+                <div style={{ ...card, padding: '24px', marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '6px' }}>
                         Оберіть аркуш кафедри
                     </h3>
-                    <p style={{ fontSize: '13px', color: '#475569', marginBottom: '16px' }}>
+                    <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '16px' }}>
                         Аркуші пронумеровані по номеру кафедри (11, 12, 21, 22 тощо)
                     </p>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
@@ -294,9 +267,9 @@ export default function ImportPage() {
                                 style={{
                                     padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '500',
                                     border: '1px solid', cursor: 'pointer',
-                                    background: selectedSheet === name ? 'rgba(37,99,235,0.2)' : 'rgba(255,255,255,0.03)',
-                                    borderColor: selectedSheet === name ? 'rgba(37,99,235,0.4)' : 'rgba(255,255,255,0.08)',
-                                    color: selectedSheet === name ? '#60a5fa' : '#94a3b8',
+                                    background: selectedSheet === name ? '#fff7ed' : '#f9fafb',
+                                    borderColor: selectedSheet === name ? '#fed7aa' : '#e5e7eb',
+                                    color: selectedSheet === name ? '#f97316' : '#6b7280',
                                     transition: 'all 0.2s',
                                 }}
                             >
@@ -313,7 +286,7 @@ export default function ImportPage() {
                             <select
                                 value={selectedDept}
                                 onChange={e => setSelectedDept(e.target.value)}
-                                style={{ padding: '10px 14px', background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '14px', color: '#e2e8f0', outline: 'none', width: '100%' }}
+                                style={{ padding: '10px 14px', background: '#f9fafb', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', color: '#111827', outline: 'none', width: '100%' }}
                             >
                                 <option value="">Оберіть кафедру</option>
                                 {departments?.map(d => <option key={d.id} value={d.id}>№ {d.number} — {d.name}</option>)}
@@ -322,7 +295,7 @@ export default function ImportPage() {
                         <button
                             onClick={parseSheet}
                             disabled={!selectedSheet || !selectedDept}
-                            style={{ padding: '10px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
+                            style={{ padding: '10px 24px', background: '#f97316', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
                         >
                             <Play size={16} /> Розпізнати дані
                         </button>
@@ -332,68 +305,69 @@ export default function ImportPage() {
 
             {/* Крок 3 */}
             {step >= 3 && parsed.length > 0 && (
-                <div style={{ ...card, padding: '24px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <div>
-                            <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', marginBottom: '4px' }}>
-                                Розпізнано дисциплін: {parsed.length}
-                            </h3>
-                            <div style={{ display: 'flex', gap: '16px', fontSize: '13px' }}>
-                                <span style={{ color: '#4ade80' }}>✓ Готово: {readyCount}</span>
-                                <span style={{ color: '#60a5fa' }}>↑ Імпортовано: {importedCount}</span>
-                                {errorCount > 0 && <span style={{ color: '#f87171' }}>✗ Помилки: {errorCount}</span>}
+                <div style={card}>
+                    <div style={{ padding: '24px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <div>
+                                <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
+                                    Розпізнано дисциплін: {parsed.length}
+                                </h3>
+                                <div style={{ display: 'flex', gap: '16px', fontSize: '13px' }}>
+                                    <span style={{ color: '#16a34a' }}>✓ Готово: {readyCount}</span>
+                                    <span style={{ color: '#3b82f6' }}>↑ Імпортовано: {importedCount}</span>
+                                    {errorCount > 0 && <span style={{ color: '#dc2626' }}>✗ Помилки: {errorCount}</span>}
+                                </div>
                             </div>
+                            {!importDone ? (
+                                <button
+                                    onClick={handleImport}
+                                    disabled={importing || readyCount === 0}
+                                    style={{ padding: '10px 24px', background: importing ? '#fed7aa' : '#f97316', color: '#fff', border: 'none', borderRadius: '8px', cursor: importing ? 'default' : 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}
+                                >
+                                    <Upload size={16} />
+                                    {importing ? 'Імпортування...' : `Імпортувати ${readyCount} дисциплін`}
+                                </button>
+                            ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', fontWeight: '600', fontSize: '14px' }}>
+                                    <CheckCircle size={18} /> Імпорт завершено!
+                                </div>
+                            )}
                         </div>
-                        {!importDone ? (
-                            <button
-                                onClick={handleImport}
-                                disabled={importing || readyCount === 0}
-                                style={{ padding: '10px 24px', background: importing ? 'rgba(34,197,94,0.3)' : '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', cursor: importing ? 'default' : 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}
-                            >
-                                <Upload size={16} />
-                                {importing ? 'Імпортування...' : `Імпортувати ${readyCount} дисциплін`}
-                            </button>
-                        ) : (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4ade80', fontWeight: '600', fontSize: '14px' }}>
-                                <CheckCircle size={18} /> Імпорт завершено!
-                            </div>
-                        )}
-                    </div>
 
-                    {/* Превью */}
-                    <div style={{ maxHeight: '500px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {parsed.map((disc, i) => (
-                            <div key={i} style={{
-                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                padding: '10px 14px', borderRadius: '8px',
-                                background: disc.status === 'imported' ? 'rgba(34,197,94,0.06)' : disc.status === 'error' ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.02)',
-                                border: `1px solid ${disc.status === 'imported' ? 'rgba(34,197,94,0.15)' : disc.status === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}`,
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                                    {disc.status === 'imported'
-                                        ? <CheckCircle size={14} color="#22c55e" />
-                                        : disc.status === 'error'
-                                            ? <AlertTriangle size={14} color="#ef4444" />
-                                            : <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '2px solid #3b82f6', flexShrink: 0 }} />
-                                    }
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '13px', color: '#e2e8f0', fontWeight: '500' }}>{disc.name}</div>
-                                        <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>
-                                            {disc.education_level.replace(/^\d+_/, '')} · Сем. {disc.semester} ·
-                                            {disc.student_count > 0 && ` ${disc.student_count} курс. ·`}
-                                            {disc.group_count > 0 && ` ${disc.group_count} гр. ·`}
-                                            {' '}Лек: {disc.lecture_hours} · Груп: {disc.group_hours}
+                        <div style={{ maxHeight: '500px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {parsed.map((disc, i) => (
+                                <div key={i} style={{
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    padding: '10px 14px', borderRadius: '8px',
+                                    background: disc.status === 'imported' ? '#f0fdf4' : disc.status === 'error' ? '#fef2f2' : '#fafafa',
+                                    border: `1px solid ${disc.status === 'imported' ? '#bbf7d0' : disc.status === 'error' ? '#fecaca' : '#f3f4f6'}`,
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                                        {disc.status === 'imported'
+                                            ? <CheckCircle size={14} color="#16a34a" />
+                                            : disc.status === 'error'
+                                                ? <AlertTriangle size={14} color="#dc2626" />
+                                                : <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '2px solid #f97316', flexShrink: 0 }} />
+                                        }
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>{disc.name}</div>
+                                            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
+                                                {disc.education_level.replace(/^\d+_/, '')} · Сем. {disc.semester} ·
+                                                {disc.student_count > 0 && ` ${disc.student_count} курс. ·`}
+                                                {disc.group_count > 0 && ` ${disc.group_count} гр. ·`}
+                                                {' '}Лек: {disc.lecture_hours} · Груп: {disc.group_hours}
+                                            </div>
                                         </div>
                                     </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                                        <span style={{ fontSize: '12px', color: '#f97316', fontWeight: '600' }}>
+                                            {disc.total_hours} год
+                                        </span>
+                                        {disc.error && <span style={{ fontSize: '11px', color: '#dc2626' }}>{disc.error}</span>}
+                                    </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                  <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600' }}>
-                    {disc.total_hours} год
-                  </span>
-                                    {disc.error && <span style={{ fontSize: '11px', color: '#f87171' }}>{disc.error}</span>}
-                                </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}

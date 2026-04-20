@@ -17,23 +17,22 @@ const emptyForm = {
     subgroup_hours: 0, tsz_hours: 0, practice_hours: 0, course_works: 0,
     control_works: 0, exams: 0, credits: 0, academic_year: '2025-2026',
     lecture_streams: 1, group_count: 1, subgroup_count: 1, student_count: 0,
-
 }
 
 const card = {
-    background: 'rgba(30,41,59,0.8)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
     borderRadius: '16px',
-    backdropFilter: 'blur(10px)',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
 }
 
 const inputStyle = {
     padding: '10px 14px',
-    background: 'rgba(15,23,42,0.8)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: '#f9fafb',
+    border: '1px solid #d1d5db',
     borderRadius: '8px',
     fontSize: '14px',
-    color: '#e2e8f0',
+    color: '#111827',
     outline: 'none',
     width: '100%',
 }
@@ -47,11 +46,11 @@ const labelStyle = {
 
 const selectStyle = {
     padding: '8px 12px',
-    background: 'rgba(15,23,42,0.8)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: '#f9fafb',
+    border: '1px solid #d1d5db',
     borderRadius: '8px',
     fontSize: '13px',
-    color: '#e2e8f0',
+    color: '#111827',
     outline: 'none',
 }
 
@@ -77,25 +76,15 @@ export default function DisciplinesPage() {
 
     const createMutation = useMutation({
         mutationFn: () => createDiscipline({
-            department_id: form.department_id,
-            name: form.name,
-            education_level: form.education_level,
-            semester: form.semester,
-            total_hours: form.total_hours,
-            lecture_hours: form.lecture_hours,
-            group_hours: form.group_hours,
-            subgroup_hours: form.subgroup_hours,
-            tsz_hours: form.tsz_hours,
-            practice_hours: form.practice_hours,
-            course_works: form.course_works,
-            control_works: form.control_works,
-            exams: form.exams,
-            credits: form.credits,
-            academic_year: form.academic_year,
-            student_count: form.student_count,
-            lecture_streams: form.lecture_streams,
-            group_count: form.group_count,
-            subgroup_count: form.subgroup_count,
+            department_id: form.department_id, name: form.name,
+            education_level: form.education_level, semester: form.semester,
+            total_hours: form.total_hours, lecture_hours: form.lecture_hours,
+            group_hours: form.group_hours, subgroup_hours: form.subgroup_hours,
+            tsz_hours: form.tsz_hours, practice_hours: form.practice_hours,
+            course_works: form.course_works, control_works: form.control_works,
+            exams: form.exams, credits: form.credits, academic_year: form.academic_year,
+            student_count: form.student_count, lecture_streams: form.lecture_streams,
+            group_count: form.group_count, subgroup_count: form.subgroup_count,
         }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['disciplines'] })
@@ -109,9 +98,9 @@ export default function DisciplinesPage() {
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['disciplines'] }),
     })
 
-    const numInput = (field: keyof typeof form, label: string) => (
+    const numInput = (field: keyof typeof form, lbl: string) => (
         <div key={field}>
-            <label style={labelStyle}>{label}</label>
+            <label style={labelStyle}>{lbl}</label>
             <input
                 style={inputStyle} type="number" min={0}
                 value={form[field] as number}
@@ -129,7 +118,6 @@ export default function DisciplinesPage() {
         subgroup_count: form.subgroup_count, student_count: form.student_count,
     })
 
-    // Фільтрація
     const filteredDisciplines = disciplines?.filter(d => {
         if (filterLevel && !d.education_level.includes(filterLevel)) return false
         if (filterForm === 'ochna' && d.education_level.includes('заочна')) return false
@@ -141,17 +129,17 @@ export default function DisciplinesPage() {
     const activeFilters = [filterLevel, filterForm, filterSemester].filter(Boolean).length
 
     if (isLoading) return (
-        <div style={{ textAlign: 'center', color: '#475569', padding: '80px' }}>Завантаження...</div>
+        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '80px' }}>Завантаження...</div>
     )
 
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                 <div>
-                    <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#f1f5f9', marginBottom: '4px' }}>
+                    <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>
                         Дисципліни
                     </h1>
-                    <p style={{ fontSize: '14px', color: '#475569' }}>
+                    <p style={{ fontSize: '14px', color: '#6b7280' }}>
                         Знайдено: {filteredDisciplines.length} з {disciplines?.length || 0}
                     </p>
                 </div>
@@ -160,12 +148,12 @@ export default function DisciplinesPage() {
                         onClick={() => setShowFilters(!showFilters)}
                         style={{
                             padding: '10px 16px',
-                            background: activeFilters > 0 ? 'rgba(37,99,235,0.2)' : 'rgba(255,255,255,0.05)',
-                            border: `1px solid ${activeFilters > 0 ? 'rgba(37,99,235,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                            background: activeFilters > 0 ? '#fff7ed' : '#f9fafb',
+                            border: `1px solid ${activeFilters > 0 ? '#fed7aa' : '#e5e7eb'}`,
                             borderRadius: '8px',
                             cursor: 'pointer',
                             fontSize: '14px',
-                            color: activeFilters > 0 ? '#60a5fa' : '#9ca3af',
+                            color: activeFilters > 0 ? '#f97316' : '#6b7280',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
@@ -174,14 +162,14 @@ export default function DisciplinesPage() {
                         <Filter size={15} />
                         Фільтри
                         {activeFilters > 0 && (
-                            <span style={{ background: '#2563eb', color: '#fff', borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '700' }}>
-                {activeFilters}
-              </span>
+                            <span style={{ background: '#f97316', color: '#fff', borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '700' }}>
+                                {activeFilters}
+                            </span>
                         )}
                     </button>
                     <button
                         onClick={() => setShowForm(!showForm)}
-                        style={{ padding: '10px 20px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        style={{ padding: '10px 20px', background: '#f97316', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
                         {showForm ? <ChevronUp size={16} /> : <Plus size={16} />}
                         Додати дисципліну
@@ -191,7 +179,7 @@ export default function DisciplinesPage() {
 
             {/* Фільтри */}
             {showFilters && (
-                <div style={{ ...card, padding: '20px', marginBottom: '20px' }}>
+                <div style={{ ...card, padding: '20px', marginBottom: '16px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
                         <div>
                             <label style={labelStyle}>Кафедра</label>
@@ -232,7 +220,7 @@ export default function DisciplinesPage() {
                     {activeFilters > 0 && (
                         <button
                             onClick={() => { setFilterLevel(''); setFilterForm(''); setFilterSemester(''); setFilterDept('') }}
-                            style={{ marginTop: '12px', padding: '6px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#f87171' }}
+                            style={{ marginTop: '12px', padding: '6px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#dc2626' }}
                         >
                             Скинути фільтри
                         </button>
@@ -242,8 +230,8 @@ export default function DisciplinesPage() {
 
             {/* Форма додавання */}
             {showForm && (
-                <div style={{ ...card, padding: '24px', marginBottom: '24px' }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', marginBottom: '20px' }}>
+                <div style={{ ...card, padding: '24px', marginBottom: '20px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '20px' }}>
                         Нова дисципліна
                     </h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
@@ -270,7 +258,7 @@ export default function DisciplinesPage() {
                         </div>
                     </div>
 
-                    <p style={{ fontWeight: '600', fontSize: '13px', color: '#94a3b8', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <p style={{ fontWeight: '600', fontSize: '12px', color: '#9ca3af', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         Години по навчальному плану
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '20px' }}>
@@ -286,7 +274,7 @@ export default function DisciplinesPage() {
                         {numInput('total_hours', 'Всього')}
                     </div>
 
-                    <p style={{ fontWeight: '600', fontSize: '13px', color: '#94a3b8', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <p style={{ fontWeight: '600', fontSize: '12px', color: '#9ca3af', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         Параметри груп
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
@@ -296,8 +284,8 @@ export default function DisciplinesPage() {
                         {numInput('subgroup_count', 'Підгруп')}
                     </div>
 
-                    <div style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-                        <p style={{ fontWeight: '600', fontSize: '13px', color: '#60a5fa', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+                        <p style={{ fontWeight: '600', fontSize: '12px', color: '#f97316', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                             Розрахунок · Наказ №155/291 · Табл. 3
                         </p>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
@@ -310,21 +298,21 @@ export default function DisciplinesPage() {
                                 ['Іспити', preview.exam_hours],
                                 ['Курсові', preview.course_work_hours],
                                 ['Заліки', preview.credit_hours],
-                            ].map(([label, value]) => (
-                                <div key={label as string} style={{ background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <div style={{ color: '#6b7280', fontSize: '12px' }}>{label}</div>
-                                    <div style={{ fontWeight: '600', color: '#e2e8f0', fontSize: '15px', marginTop: '2px' }}>{value}</div>
+                            ].map(([lbl, value]) => (
+                                <div key={lbl as string} style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #fde8cc' }}>
+                                    <div style={{ color: '#9ca3af', fontSize: '12px' }}>{lbl}</div>
+                                    <div style={{ fontWeight: '600', color: '#111827', fontSize: '15px', marginTop: '2px' }}>{value}</div>
                                 </div>
                             ))}
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                            <div style={{ padding: '12px 16px', background: 'rgba(37,99,235,0.2)', border: '1px solid rgba(37,99,235,0.3)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '13px', color: '#93c5fd' }}>Загальний час</span>
-                                <span style={{ fontWeight: '700', color: '#fff', fontSize: '18px' }}>{preview.total_hours} год</span>
+                            <div style={{ padding: '12px 16px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '13px', color: '#3b82f6' }}>Загальний час</span>
+                                <span style={{ fontWeight: '700', color: '#1d4ed8', fontSize: '18px' }}>{preview.total_hours} год</span>
                             </div>
-                            <div style={{ padding: '12px 16px', background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '13px', color: '#86efac' }}>Потреба в НПП</span>
-                                <span style={{ fontWeight: '700', color: '#fff', fontSize: '18px' }}>{preview.required_staff}</span>
+                            <div style={{ padding: '12px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '13px', color: '#16a34a' }}>Потреба в НПП</span>
+                                <span style={{ fontWeight: '700', color: '#15803d', fontSize: '18px' }}>{preview.required_staff}</span>
                             </div>
                         </div>
                     </div>
@@ -340,7 +328,7 @@ export default function DisciplinesPage() {
                         </button>
                         <button
                             onClick={() => setShowForm(false)}
-                            style={{ padding: '10px 16px', background: '#374151', color: '#9ca3af', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            style={{ padding: '10px 16px', background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
                             <X size={16} /> Скасувати
                         </button>
@@ -351,12 +339,12 @@ export default function DisciplinesPage() {
             {/* Список дисциплін */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {filteredDisciplines.length === 0 && (
-                    <div style={{ ...card, padding: '64px', textAlign: 'center', color: '#374151' }}>
-                        <BookOpen size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-                        <div style={{ fontSize: '15px' }}>
+                    <div style={{ ...card, padding: '64px', textAlign: 'center' }}>
+                        <BookOpen size={48} style={{ margin: '0 auto 16px', opacity: 0.2, color: '#9ca3af' }} />
+                        <div style={{ fontSize: '15px', color: '#9ca3af' }}>
                             {disciplines?.length === 0 ? 'Дисциплін ще немає' : 'Нічого не знайдено'}
                         </div>
-                        <div style={{ fontSize: '13px', marginTop: '4px' }}>
+                        <div style={{ fontSize: '13px', marginTop: '4px', color: '#d1d5db' }}>
                             {disciplines?.length === 0 ? 'Додайте першу дисципліну' : 'Спробуйте змінити фільтри'}
                         </div>
                     </div>
@@ -383,23 +371,23 @@ export default function DisciplinesPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1 }}>
                                 <div style={{ width: '4px', height: '40px', borderRadius: '2px', background: levelColor, flexShrink: 0 }} />
                                 <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#f1f5f9' }}>{d.name}</div>
+                                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>{d.name}</div>
                                     <div style={{ display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '4px', background: `${levelColor}20`, color: levelColor, fontWeight: '500' }}>
-                      {d.education_level.replace(/^\d+_/, '')}
-                    </span>
-                                        <span style={{ fontSize: '12px', color: '#475569' }}>Сем. {d.semester}</span>
-                                        <span style={{ fontSize: '12px', color: '#475569' }}>Каф. №{dept?.number}</span>
-                                        <span style={{ fontSize: '12px', color: '#475569' }}>Лек: {d.lecture_hours}</span>
-                                        <span style={{ fontSize: '12px', color: '#475569' }}>Груп: {d.group_hours}</span>
-                                        <span style={{ fontSize: '12px', color: '#475569' }}>Підгр: {d.subgroup_hours}</span>
-                                        <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600' }}>{calc.total_hours} год</span>
+                                        <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '4px', background: `${levelColor}18`, color: levelColor, fontWeight: '500', border: `1px solid ${levelColor}30` }}>
+                                            {d.education_level.replace(/^\d+_/, '')}
+                                        </span>
+                                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Сем. {d.semester}</span>
+                                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Каф. №{dept?.number}</span>
+                                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Лек: {d.lecture_hours}</span>
+                                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Груп: {d.group_hours}</span>
+                                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Підгр: {d.subgroup_hours}</span>
+                                        <span style={{ fontSize: '12px', color: '#f97316', fontWeight: '600' }}>{calc.total_hours} год</span>
                                     </div>
                                 </div>
                             </div>
                             <button
                                 onClick={() => deleteMutation.mutate(d.id)}
-                                style={{ padding: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '12px' }}
+                                style={{ padding: '8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#dc2626', display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '12px' }}
                             >
                                 <Trash2 size={15} />
                             </button>

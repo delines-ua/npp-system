@@ -18,10 +18,10 @@ const SUGGESTED_QUESTIONS = [
 ]
 
 const card = {
-    background: 'rgba(30,41,59,0.8)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
     borderRadius: '16px',
-    backdropFilter: 'blur(10px)',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
 }
 
 export default function AssistantPage() {
@@ -75,15 +75,15 @@ export default function AssistantPage() {
     }
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 124px)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 112px)' }}>
 
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                 <div>
-                    <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#f1f5f9', marginBottom: '4px' }}>
+                    <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>
                         AI Асистент
                     </h1>
-                    <p style={{ fontSize: '14px', color: '#475569' }}>
+                    <p style={{ fontSize: '14px', color: '#6b7280' }}>
                         Інтелектуальний помічник по наказу № 155/291
                     </p>
                 </div>
@@ -95,17 +95,13 @@ export default function AssistantPage() {
                     borderRadius: '20px',
                     fontSize: '13px',
                     fontWeight: '500',
-                    background: ollamaReady === null
-                        ? 'rgba(107,114,128,0.15)'
-                        : ollamaReady
-                            ? 'rgba(34,197,94,0.1)'
-                            : 'rgba(239,68,68,0.1)',
-                    border: `1px solid ${ollamaReady === null ? 'rgba(107,114,128,0.2)' : ollamaReady ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)'}`,
-                    color: ollamaReady === null ? '#6b7280' : ollamaReady ? '#4ade80' : '#f87171',
+                    background: ollamaReady === null ? '#f9fafb' : ollamaReady ? '#f0fdf4' : '#fef2f2',
+                    border: `1px solid ${ollamaReady === null ? '#e5e7eb' : ollamaReady ? '#bbf7d0' : '#fecaca'}`,
+                    color: ollamaReady === null ? '#9ca3af' : ollamaReady ? '#16a34a' : '#dc2626',
                 }}>
                     <div style={{
                         width: '7px', height: '7px', borderRadius: '50%',
-                        background: ollamaReady === null ? '#6b7280' : ollamaReady ? '#22c55e' : '#ef4444',
+                        background: ollamaReady === null ? '#9ca3af' : ollamaReady ? '#22c55e' : '#ef4444',
                     }} />
                     {ollamaReady === null ? 'Перевірка...' : ollamaReady ? 'Mistral готова' : 'Модель не завантажена'}
                 </div>
@@ -113,14 +109,14 @@ export default function AssistantPage() {
 
             {/* Підказки */}
             {messages.length === 0 && (
-                <div style={{ marginBottom: '20px' }}>
-                    <div style={{ ...card, padding: '20px 24px', marginBottom: '16px' }}>
+                <div style={{ marginBottom: '16px' }}>
+                    <div style={{ ...card, padding: '20px 24px', marginBottom: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                            <div style={{ padding: '8px', background: 'rgba(37,99,235,0.15)', borderRadius: '8px' }}>
-                                <Bot size={18} color="#3b82f6" />
+                            <div style={{ padding: '8px', background: '#fff7ed', borderRadius: '8px', border: '1px solid #fed7aa' }}>
+                                <Bot size={18} color="#f97316" />
                             </div>
                             <div>
-                                <div style={{ fontWeight: '600', fontSize: '14px', color: '#e2e8f0' }}>
+                                <div style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>
                                     Асистент знає наказ № 155/291
                                 </div>
                                 <div style={{ fontSize: '12px', color: '#6b7280' }}>
@@ -128,7 +124,7 @@ export default function AssistantPage() {
                                 </div>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: '#475569' }}>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: '#6b7280' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <Zap size={13} color="#f59e0b" /> Швидкі відповіді
                             </div>
@@ -148,27 +144,28 @@ export default function AssistantPage() {
                                 onClick={() => sendMessage(q.text)}
                                 style={{
                                     padding: '12px 16px',
-                                    background: 'rgba(30,41,59,0.6)',
-                                    border: '1px solid rgba(255,255,255,0.06)',
+                                    background: '#ffffff',
+                                    border: '1px solid #e5e7eb',
                                     borderRadius: '10px',
                                     fontSize: '13px',
-                                    color: '#94a3b8',
+                                    color: '#374151',
                                     cursor: 'pointer',
                                     textAlign: 'left',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '10px',
                                     transition: 'all 0.2s',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                                 }}
                                 onMouseEnter={e => {
-                                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(37,99,235,0.1)'
-                                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(37,99,235,0.25)'
-                                    ;(e.currentTarget as HTMLButtonElement).style.color = '#e2e8f0'
+                                    (e.currentTarget as HTMLButtonElement).style.background = '#fff7ed'
+                                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#fed7aa'
+                                    ;(e.currentTarget as HTMLButtonElement).style.color = '#111827'
                                 }}
                                 onMouseLeave={e => {
-                                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(30,41,59,0.6)'
-                                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.06)'
-                                    ;(e.currentTarget as HTMLButtonElement).style.color = '#94a3b8'
+                                    (e.currentTarget as HTMLButtonElement).style.background = '#ffffff'
+                                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#e5e7eb'
+                                    ;(e.currentTarget as HTMLButtonElement).style.color = '#374151'
                                 }}
                             >
                                 <span style={{ fontSize: '16px' }}>{q.icon}</span>
@@ -185,13 +182,13 @@ export default function AssistantPage() {
                 overflowY: 'auto',
                 ...card,
                 padding: '20px',
-                marginBottom: '16px',
+                marginBottom: '12px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '16px',
             }}>
                 {messages.length === 0 && (
-                    <div style={{ textAlign: 'center', color: '#374151', padding: '40px', fontSize: '14px' }}>
+                    <div style={{ textAlign: 'center', color: '#d1d5db', padding: '40px', fontSize: '14px' }}>
                         Задайте питання або оберіть з підказок вище
                     </div>
                 )}
@@ -199,8 +196,8 @@ export default function AssistantPage() {
                 {messages.map((msg, i) => (
                     <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: '10px' }}>
                         {msg.role === 'assistant' && (
-                            <div style={{ width: '32px', height: '32px', background: 'rgba(37,99,235,0.2)', border: '1px solid rgba(37,99,235,0.3)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
-                                <Bot size={16} color="#3b82f6" />
+                            <div style={{ width: '32px', height: '32px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                                <Bot size={16} color="#f97316" />
                             </div>
                         )}
                         <div style={{ maxWidth: '75%' }}>
@@ -208,25 +205,25 @@ export default function AssistantPage() {
                                 padding: '12px 16px',
                                 borderRadius: msg.role === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
                                 background: msg.role === 'user'
-                                    ? 'linear-gradient(135deg, #1d4ed8, #2563eb)'
-                                    : 'rgba(255,255,255,0.04)',
-                                border: msg.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                                    ? 'linear-gradient(135deg, #f97316, #ea580c)'
+                                    : '#f9fafb',
+                                border: msg.role === 'user' ? 'none' : '1px solid #e5e7eb',
                                 fontSize: '14px',
-                                color: '#e2e8f0',
+                                color: msg.role === 'user' ? '#fff' : '#374151',
                                 lineHeight: '1.7',
                                 whiteSpace: 'pre-wrap',
-                                boxShadow: msg.role === 'user' ? '0 4px 15px rgba(37,99,235,0.2)' : 'none',
+                                boxShadow: msg.role === 'user' ? '0 4px 12px rgba(249,115,22,0.2)' : 'none',
                             }}>
                                 {msg.content || (isLoading && i === messages.length - 1 ? (
                                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                                         {[0, 1, 2].map(j => (
-                                            <div key={j} style={{ width: '6px', height: '6px', background: '#3b82f6', borderRadius: '50%', animation: `bounce 1s ${j * 0.2}s infinite` }} />
+                                            <div key={j} style={{ width: '6px', height: '6px', background: '#f97316', borderRadius: '50%', animation: `bounce 1s ${j * 0.2}s infinite` }} />
                                         ))}
                                     </div>
                                 ) : '')}
                             </div>
                             {msg.time && (
-                                <div style={{ fontSize: '11px', color: '#374151', marginTop: '4px', textAlign: msg.role === 'user' ? 'right' : 'left', paddingLeft: msg.role === 'assistant' ? '4px' : '0' }}>
+                                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px', textAlign: msg.role === 'user' ? 'right' : 'left', paddingLeft: msg.role === 'assistant' ? '4px' : '0' }}>
                                     {msg.time}
                                 </div>
                             )}
@@ -237,7 +234,7 @@ export default function AssistantPage() {
             </div>
 
             {/* Поле вводу */}
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <input
                     value={input}
                     onChange={e => setInput(e.target.value)}
@@ -246,22 +243,23 @@ export default function AssistantPage() {
                     disabled={isLoading}
                     style={{
                         flex: 1,
-                        padding: '14px 18px',
-                        background: 'rgba(30,41,59,0.8)',
-                        border: '1px solid rgba(255,255,255,0.08)',
+                        padding: '12px 18px',
+                        background: '#ffffff',
+                        border: '1px solid #d1d5db',
                         borderRadius: '12px',
                         fontSize: '14px',
-                        color: '#e2e8f0',
+                        color: '#111827',
                         outline: 'none',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                     }}
                 />
                 <button
                     onClick={() => sendMessage(input)}
                     disabled={isLoading || !input.trim()}
                     style={{
-                        width: '48px',
-                        height: '48px',
-                        background: isLoading || !input.trim() ? 'rgba(37,99,235,0.3)' : '#2563eb',
+                        width: '46px',
+                        height: '46px',
+                        background: isLoading || !input.trim() ? '#fed7aa' : '#f97316',
                         border: 'none',
                         borderRadius: '12px',
                         cursor: isLoading || !input.trim() ? 'default' : 'pointer',

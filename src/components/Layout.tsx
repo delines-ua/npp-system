@@ -2,7 +2,7 @@ import { Outlet, NavLink } from 'react-router-dom'
 import { Upload } from 'lucide-react'
 import {
     LayoutDashboard, Building2, Users, BookOpen,
-    ClipboardList, Bot, ChevronRight,
+    ClipboardList, Bot, LogOut,
 } from 'lucide-react'
 
 const links = [
@@ -17,24 +17,27 @@ const links = [
 
 export default function Layout() {
     return (
-        <div style={{ display: 'flex', minHeight: '100vh', background: '#13203a' }}>
+        <div style={{ display: 'flex', minHeight: '100vh', background: '#f0f2f5' }}>
 
             {/* Sidebar */}
             <aside style={{
-                width: '260px',
-                background: 'linear-gradient(180deg, #111827 0%, #1a2744 100%)',
-                borderRight: '1px solid rgba(255,255,255,0.08)',
+                width: '240px',
+                background: '#433a2c',
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'fixed',
-                height: '100vh',
+                top: '12px',
+                left: '12px',
+                height: 'calc(100vh - 24px)',
+                borderRadius: '16px',
                 zIndex: 100,
+                boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
             }}>
 
                 {/* Logo */}
                 <div style={{
-                    padding: '24px 20px',
-                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                    padding: '20px 16px',
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
@@ -43,31 +46,31 @@ export default function Layout() {
                         src="/images (2).jpg"
                         alt="ВІТІ"
                         style={{
-                            width: '44px',
-                            height: '44px',
-                            borderRadius: '10px',
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
                             objectFit: 'cover',
                         }}
                     />
                     <div>
-                        <div style={{ fontWeight: '700', fontSize: '15px', color: '#f1f5f9', letterSpacing: '0.5px' }}>
+                        <div style={{ fontWeight: '700', fontSize: '14px', color: '#f1f5f9', letterSpacing: '0.3px' }}>
                             СППР ВІТІ
                         </div>
-                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+                        <div style={{ fontSize: '11px', color: '#6b6b50', marginTop: '2px' }}>
                             Облік навантаження НПП
                         </div>
                     </div>
                 </div>
 
                 {/* Nav */}
-                <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <div style={{
                         fontSize: '10px',
-                        color: '#4b5563',
+                        color: '#4b5040',
                         fontWeight: '600',
                         letterSpacing: '1px',
-                        padding: '8px 8px 8px',
-                        textTransform: 'uppercase'
+                        padding: '8px 8px 6px',
+                        textTransform: 'uppercase',
                     }}>
                         Навігація
                     </div>
@@ -85,19 +88,15 @@ export default function Layout() {
                                 textDecoration: 'none',
                                 fontSize: '14px',
                                 fontWeight: isActive ? '600' : '400',
-                                color: isActive ? '#fff' : '#9ca3af',
-                                background: isActive
-                                    ? 'linear-gradient(135deg, #1d4ed8, #2563eb)'
-                                    : 'transparent',
-                                boxShadow: isActive ? '0 4px 15px rgba(37,99,235,0.25)' : 'none',
-                                transition: 'all 0.2s ease',
+                                color: isActive ? '#fff' : '#8a8a72',
+                                background: isActive ? '#f97316' : 'transparent',
+                                transition: 'all 0.15s ease',
                             })}
                         >
                             {({ isActive }) => (
                                 <>
-                                    <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} />
+                                    <Icon size={17} strokeWidth={isActive ? 2.5 : 1.8} />
                                     <span style={{ flex: 1 }}>{label}</span>
-                                    {isActive && <ChevronRight size={14} style={{ opacity: 0.7 }} />}
                                 </>
                             )}
                         </NavLink>
@@ -106,69 +105,59 @@ export default function Layout() {
 
                 {/* Footer */}
                 <div style={{
-                    padding: '16px 20px',
+                    padding: '14px 16px',
                     borderTop: '1px solid rgba(255,255,255,0.06)',
-                    fontSize: '11px',
-                    color: '#374151',
-                    textAlign: 'center',
-                    lineHeight: '1.6',
                 }}>
-                    <div style={{ color: '#4b5563' }}>ВІТІ імені Героїв Крут</div>
-                    <div style={{ color: '#374151' }}>2025-2026 навч. рік</div>
+                    <div style={{ fontSize: '11px', color: '#4b5040', textAlign: 'center', lineHeight: '1.6', marginBottom: '10px' }}>
+                        <div>ВІТІ імені Героїв Крут</div>
+                        <div>2025-2026 навч. рік</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', color: '#6b6b50', fontSize: '13px', cursor: 'pointer' }}>
+                        <LogOut size={15} />
+                        <span>Вийти</span>
+                    </div>
                 </div>
             </aside>
 
             {/* Main */}
-            <div style={{ marginLeft: '260px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ marginLeft: '264px', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
                 {/* Header */}
                 <header style={{
-                    height: '60px',
-                    background: 'rgba(17,24,39,0.95)',
-                    backdropFilter: 'blur(10px)',
-                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    height: '56px',
+                    background: '#ffffff',
+                    borderBottom: '1px solid #e5e7eb',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '0 32px',
+                    padding: '0 28px',
                     position: 'sticky',
                     top: 0,
                     zIndex: 50,
                 }}>
-                    <div style={{ fontSize: '13px', color: '#4b5563' }}>
+                    <div style={{ fontSize: '13px', color: '#9ca3af' }}>
                         Військовий інститут телекомунікацій та інформатизації імені Героїв Крут
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '5px 12px',
-                            background: 'rgba(34,197,94,0.1)',
-                            border: '1px solid rgba(34,197,94,0.2)',
-                            borderRadius: '20px',
-                            fontSize: '12px',
-                            color: '#4ade80',
-                            fontWeight: '500',
+                            width: '32px', height: '32px',
+                            background: '#f97316',
+                            borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '13px', fontWeight: '700', color: '#fff',
                         }}>
-                            <div style={{
-                                width: '6px',
-                                height: '6px',
-                                background: '#22c55e',
-                                borderRadius: '50%',
-                                animation: 'pulse 2s infinite',
-                            }} />
-                            Система активна
+                            А
                         </div>
+                        <span style={{ fontSize: '13px', fontWeight: '500', color: '#374151' }}>Адміністратор</span>
                     </div>
                 </header>
 
                 {/* Content */}
                 <main style={{
                     flex: 1,
-                    padding: '32px',
-                    background: '#111827',
-                    minHeight: 'calc(100vh - 60px)',
+                    padding: '28px',
+                    background: '#f0f2f5',
+                    minHeight: 'calc(100vh - 56px)',
                 }}>
                     <Outlet />
                 </main>

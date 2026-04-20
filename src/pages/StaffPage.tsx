@@ -12,19 +12,19 @@ const POSITIONS = [
 const RATES = [0.2, 0.25, 0.5, 0.75, 1.0, 1.5]
 
 const card = {
-    background: 'rgba(30,41,59,0.8)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
     borderRadius: '16px',
-    backdropFilter: 'blur(10px)',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
 }
 
 const inputStyle = {
     padding: '10px 14px',
-    background: 'rgba(15,23,42,0.8)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: '#f9fafb',
+    border: '1px solid #d1d5db',
     borderRadius: '8px',
     fontSize: '14px',
-    color: '#e2e8f0',
+    color: '#111827',
     outline: 'none',
     width: '100%',
 }
@@ -73,31 +73,31 @@ export default function StaffPage() {
     })
 
     if (isLoading) return (
-        <div style={{ textAlign: 'center', color: '#475569', padding: '80px' }}>Завантаження...</div>
+        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '80px' }}>Завантаження...</div>
     )
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
                 <div>
-                    <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#f1f5f9', marginBottom: '4px' }}>
+                    <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>
                         Науково-педагогічні працівники
                     </h1>
-                    <p style={{ fontSize: '14px', color: '#475569' }}>
+                    <p style={{ fontSize: '14px', color: '#6b7280' }}>
                         Облік НПП та лімітів навчального навантаження
                     </p>
                 </div>
                 <button
                     onClick={() => setShowForm(!showForm)}
-                    style={{ padding: '10px 20px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    style={{ padding: '10px 20px', background: '#f97316', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                     <Plus size={16} /> Додати НПП
                 </button>
             </div>
 
             {showForm && (
-                <div style={{ ...card, padding: '24px', marginBottom: '24px' }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', marginBottom: '20px' }}>
+                <div style={{ ...card, padding: '24px', marginBottom: '20px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '20px' }}>
                         Новий науково-педагогічний працівник
                     </h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
@@ -147,7 +147,7 @@ export default function StaffPage() {
                         </button>
                         <button
                             onClick={() => setShowForm(false)}
-                            style={{ padding: '10px 16px', background: '#374151', color: '#9ca3af', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            style={{ padding: '10px 16px', background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
                             <X size={16} /> Скасувати
                         </button>
@@ -155,12 +155,12 @@ export default function StaffPage() {
                 </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {staff?.length === 0 && (
-                    <div style={{ ...card, padding: '64px', textAlign: 'center', color: '#374151' }}>
-                        <Users size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-                        <div style={{ fontSize: '15px' }}>НПП ще немає</div>
-                        <div style={{ fontSize: '13px', marginTop: '4px' }}>Додайте першого працівника</div>
+                    <div style={{ ...card, padding: '64px', textAlign: 'center' }}>
+                        <Users size={48} style={{ margin: '0 auto 16px', opacity: 0.2, color: '#9ca3af' }} />
+                        <div style={{ fontSize: '15px', color: '#9ca3af' }}>НПП ще немає</div>
+                        <div style={{ fontSize: '13px', marginTop: '4px', color: '#d1d5db' }}>Додайте першого працівника</div>
                     </div>
                 )}
 
@@ -169,35 +169,35 @@ export default function StaffPage() {
                     const limit = getStaffHourLimit(s.rate, s.is_military, s.service_years)
 
                     return (
-                        <div key={s.id} style={{ ...card, padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div key={s.id} style={{ ...card, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                                 <div style={{
                                     width: '42px', height: '42px',
-                                    background: s.is_military ? 'rgba(37,99,235,0.15)' : 'rgba(107,114,128,0.15)',
-                                    border: `1px solid ${s.is_military ? 'rgba(37,99,235,0.2)' : 'rgba(107,114,128,0.2)'}`,
+                                    background: s.is_military ? '#eff6ff' : '#f9fafb',
+                                    border: `1px solid ${s.is_military ? '#bfdbfe' : '#e5e7eb'}`,
                                     borderRadius: '10px',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 }}>
                                     {s.is_military
                                         ? <Shield size={20} color="#3b82f6" />
-                                        : <User size={20} color="#6b7280" />
+                                        : <User size={20} color="#9ca3af" />
                                     }
                                 </div>
                                 <div>
-                                    <div style={{ fontWeight: '600', fontSize: '15px', color: '#f1f5f9' }}>
+                                    <div style={{ fontWeight: '600', fontSize: '15px', color: '#111827' }}>
                                         {s.full_name}
                                     </div>
                                     <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
                                         {s.position} · Кафедра № {dept?.number} · {s.rate} ставки · {s.is_military ? `вислуга ${s.service_years} р.` : 'цивільний'}
                                     </div>
-                                    <div style={{ fontSize: '12px', color: '#3b82f6', marginTop: '4px', fontWeight: '500' }}>
+                                    <div style={{ fontSize: '12px', color: '#f97316', marginTop: '4px', fontWeight: '500' }}>
                                         Ліміт навантаження: {limit} год/рік
                                     </div>
                                 </div>
                             </div>
                             <button
                                 onClick={() => deleteMutation.mutate(s.id)}
-                                style={{ padding: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center' }}
+                                style={{ padding: '8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#dc2626', display: 'flex', alignItems: 'center' }}
                             >
                                 <Trash2 size={16} />
                             </button>
