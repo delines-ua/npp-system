@@ -56,7 +56,7 @@ export default function Layout() {
                         <div style={{ fontWeight: '700', fontSize: '14px', color: '#f1f5f9', letterSpacing: '0.3px' }}>
                             СППР ВІТІ
                         </div>
-                        <div style={{ fontSize: '11px', color: '#6b6b50', marginTop: '2px' }}>
+                        <div style={{ fontSize: '11px', color: '#6c6c5c', marginTop: '2px' }}>
                             Облік навантаження НПП
                         </div>
                     </div>
@@ -66,13 +66,12 @@ export default function Layout() {
                 <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <div style={{
                         fontSize: '10px',
-                        color: '#4b5040',
+                        color: '#ffffff',
                         fontWeight: '600',
                         letterSpacing: '1px',
                         padding: '8px 8px 6px',
                         textTransform: 'uppercase',
                     }}>
-                        Навігація
                     </div>
 
                     {links.map(({ to, label, icon: Icon }) => (
@@ -88,7 +87,7 @@ export default function Layout() {
                                 textDecoration: 'none',
                                 fontSize: '14px',
                                 fontWeight: isActive ? '600' : '400',
-                                color: isActive ? '#fff' : '#8a8a72',
+                                color: isActive ? '#fff' : '#e3e3e3',
                                 background: isActive ? '#f97316' : 'transparent',
                                 transition: 'all 0.15s ease',
                             })}
@@ -108,12 +107,11 @@ export default function Layout() {
                     padding: '14px 16px',
                     borderTop: '1px solid rgba(255,255,255,0.06)',
                 }}>
-                    <div style={{ fontSize: '11px', color: '#4b5040', textAlign: 'center', lineHeight: '1.6', marginBottom: '10px' }}>
-                        <div>ВІТІ імені Героїв Крут</div>
-                        <div>2025-2026 навч. рік</div>
+                    <div style={{ fontSize: '11px', color: '#8a8080', textAlign: 'center', lineHeight: '1.6', marginBottom: '10px' }}>
+
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', color: '#6b6b50', fontSize: '13px', cursor: 'pointer' }}>
-                        <LogOut size={15} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', color: '#e3e3e3', fontSize: '16px', cursor: 'pointer' }}>
+                        <LogOut size={16} />
                         <span>Вийти</span>
                     </div>
                 </div>
