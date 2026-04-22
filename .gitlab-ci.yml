@@ -4,7 +4,7 @@ stages:
 build:
   stage: build
   tags:
-    - shell
+    - build
   script:
     - node --version
     - npm --version
