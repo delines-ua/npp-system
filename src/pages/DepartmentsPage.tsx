@@ -7,7 +7,7 @@ const card = {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '16px',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.08)',
 }
 
 const input = {

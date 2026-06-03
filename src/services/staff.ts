@@ -19,6 +19,11 @@ export const createStaff = async (staff: Omit<Staff, 'id' | 'created_at'>): Prom
     return data
 }
 
+export const updateStaff = async (id: string, data: Partial<Omit<Staff, 'id' | 'created_at'>>): Promise<void> => {
+    const { error } = await supabase.from('staff').update(data).eq('id', id)
+    if (error) throw error
+}
+
 export const deleteStaff = async (id: string): Promise<void> => {
     const { error } = await supabase.from('staff').delete().eq('id', id)
     if (error) throw error

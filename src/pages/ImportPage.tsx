@@ -1,15 +1,17 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import { getDepartments } from '../services/departments'
-import { createDiscipline } from '../services/disciplines'
-import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Play } from 'lucide-react'
+import { upsertDiscipline } from '../services/disciplines'
+import { autoLinkGroupsBySpecialty } from '../services/instituteGroups'
+import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Play, Link } from 'lucide-react'
+import Select from '../components/Select'
 
 const card = {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '16px',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.08)',
 }
 
 interface ParsedDiscipline {
@@ -29,7 +31,8 @@ interface ParsedDiscipline {
     lecture_streams: number
     group_count: number
     subgroup_count: number
-    status: 'ready' | 'error' | 'imported'
+    specialty_codes: string   // "122,126" — коди спеціальностей
+    status: 'ready' | 'error' | 'imported' | 'updated'
     error?: string
 }
 
@@ -49,6 +52,12 @@ export default function ImportPage() {
         queryKey: ['departments'],
         queryFn: getDepartments,
     })
+    useEffect(() => {
+        if (!selectedDept && departments?.length) {
+            const d = departments.find(d => d.number === '22')
+            if (d) setSelectedDept(d.id)
+        }
+    }, [departments])
 
     const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -121,6 +130,21 @@ export default function ImportPage() {
             const group_count = Number(row[23]) || 1
             const subgroup_count = Number(row[24]) || 1
 
+            // Коди спеціальностей (кол.20): можуть бути числом (122.126) або текстом ("122,125,126")
+            const rawSpec = row[20]
+            let specialty_codes = ''
+            if (rawSpec != null) {
+                const s = String(rawSpec).trim()
+                // Нормалізація: "255а" → "255", "125-1" → "125"
+                const normalizeCode = (c: string) =>
+                    c.trim().replace(/[а-яА-Яa-zA-Z]+$/, '').replace(/-\d+$/, '').trim()
+                // Числа з крапкою (наприклад 172.253) — два коди через "."
+                const parts = /^[\d.]+$/.test(s) && s.includes('.')
+                    ? s.split('.')
+                    : s.split(',')
+                specialty_codes = parts.map(normalizeCode).filter(Boolean).join(',')
+            }
+
             const calculated_total = Number(row[77]) || 0
             const total_hours = Math.max(
                 calculated_total > 0 ? calculated_total : 0,
@@ -133,6 +157,7 @@ export default function ImportPage() {
                 lecture_hours, group_hours, subgroup_hours, practice_hours,
                 course_works, control_works, exams, credits, total_hours,
                 student_count, lecture_streams, group_count, subgroup_count,
+                specialty_codes,
                 status: 'ready',
             })
         }
@@ -149,7 +174,7 @@ export default function ImportPage() {
         for (let i = 0; i < updated.length; i++) {
             if (updated[i].status !== 'ready') continue
             try {
-                await createDiscipline({
+                const discId = await upsertDiscipline({
                     department_id: selectedDept, name: updated[i].name,
                     education_level: updated[i].education_level, semester: updated[i].semester,
                     total_hours: updated[i].total_hours, lecture_hours: updated[i].lecture_hours,
@@ -160,7 +185,13 @@ export default function ImportPage() {
                     academic_year: '2025-2026', student_count: updated[i].student_count,
                     lecture_streams: updated[i].lecture_streams, group_count: updated[i].group_count,
                     subgroup_count: updated[i].subgroup_count,
+                    group_names: '',
+                    specialty_codes: updated[i].specialty_codes,
                 })
+                // Авто-прив'язка груп по кодах спеціальностей та курсу (семестр→курс)
+                if (updated[i].specialty_codes) {
+                    await autoLinkGroupsBySpecialty(discId, updated[i].specialty_codes, updated[i].semester)
+                }
                 updated[i] = { ...updated[i], status: 'imported' }
             } catch {
                 updated[i] = { ...updated[i], status: 'error', error: 'Помилка збереження' }
@@ -283,14 +314,12 @@ export default function ImportPage() {
                             <label style={{ display: 'block', fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>
                                 Прив'язати до кафедри в системі
                             </label>
-                            <select
+                            <Select
                                 value={selectedDept}
-                                onChange={e => setSelectedDept(e.target.value)}
-                                style={{ padding: '10px 14px', background: '#f9fafb', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', color: '#111827', outline: 'none', width: '100%' }}
-                            >
-                                <option value="">Оберіть кафедру</option>
-                                {departments?.map(d => <option key={d.id} value={d.id}>№ {d.number} — {d.name}</option>)}
-                            </select>
+                                onChange={setSelectedDept}
+                                placeholder="Оберіть кафедру"
+                                options={departments?.map(d => ({ value: d.id, label: `№ ${d.number} — ${d.name}` })) ?? []}
+                            />
                         </div>
                         <button
                             onClick={parseSheet}
@@ -352,10 +381,14 @@ export default function ImportPage() {
                                         <div style={{ flex: 1 }}>
                                             <div style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>{disc.name}</div>
                                             <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
-                                                {disc.education_level.replace(/^\d+_/, '')} · Сем. {disc.semester} ·
-                                                {disc.student_count > 0 && ` ${disc.student_count} курс. ·`}
-                                                {disc.group_count > 0 && ` ${disc.group_count} гр. ·`}
-                                                {' '}Лек: {disc.lecture_hours} · Груп: {disc.group_hours}
+                                                {disc.education_level.replace(/^\d+_/, '')} · Сем. {disc.semester}
+                                                {disc.student_count > 0 && ` · ${disc.student_count} ос.`}
+                                                {disc.group_count > 0 && ` · ${disc.group_count} гр.`}
+                                                {disc.specialty_codes && (
+                                                    <span style={{ marginLeft: '4px', color: '#3b82f6' }}>
+                                                        · Спец: {disc.specialty_codes}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

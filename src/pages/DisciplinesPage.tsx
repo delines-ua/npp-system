@@ -1,399 +1,482 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getDisciplines, createDiscipline, deleteDiscipline } from '../services/disciplines'
+import { getDisciplines, createDiscipline, updateDiscipline, deleteDiscipline } from '../services/disciplines'
 import { getDepartments } from '../services/departments'
-import { calculateWorkload } from '../utils/workload'
-import { BookOpen, Plus, Trash2, X, Save, ChevronUp, Filter } from 'lucide-react'
+import { EDUCATION_LEVELS } from '../utils/lawNorms'
+import type { Discipline } from '../types/database'
+import { BookOpen, Plus, Trash2, X, Save, Search, Edit2, ChevronUp } from 'lucide-react'
+import Select from '../components/Select'
 
-const EDUCATION_LEVELS = [
-    '1_Бакалавр (очна)', '2_Бакалавр (заочна)', '3_Магістр (очна)',
-    '4_Доктор філософії', '5_Базова загальновійськова підготовка',
-    '6_Курси професійної військової освіти', '7_Курси підвищення кваліфікації',
-]
+const ACADEMIC_YEAR = '2025-2026'
 
-const emptyForm = {
-    department_id: '', name: '', education_level: '1_Бакалавр (очна)',
-    semester: 1, total_hours: 0, lecture_hours: 0, group_hours: 0,
-    subgroup_hours: 0, tsz_hours: 0, practice_hours: 0, course_works: 0,
-    control_works: 0, exams: 0, credits: 0, academic_year: '2025-2026',
-    lecture_streams: 1, group_count: 1, subgroup_count: 1, student_count: 0,
-}
-
-const card = {
+const card: React.CSSProperties = {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '16px',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.08)',
 }
 
-const inputStyle = {
-    padding: '10px 14px',
-    background: '#f9fafb',
-    border: '1px solid #d1d5db',
-    borderRadius: '8px',
-    fontSize: '14px',
-    color: '#111827',
-    outline: 'none',
-    width: '100%',
+const inputStyle: React.CSSProperties = {
+    padding: '8px 11px', background: '#f9fafb', border: '1px solid #d1d5db',
+    borderRadius: '8px', fontSize: '13px', color: '#111827', outline: 'none', width: '100%',
+    boxSizing: 'border-box',
 }
 
-const labelStyle = {
-    display: 'block' as const,
-    fontSize: '12px',
-    color: '#6b7280',
-    marginBottom: '6px',
+const labelStyle: React.CSSProperties = {
+    display: 'block', fontSize: '11px', color: '#6b7280', marginBottom: '4px', fontWeight: '500',
 }
 
-const selectStyle = {
-    padding: '8px 12px',
-    background: '#f9fafb',
-    border: '1px solid #d1d5db',
-    borderRadius: '8px',
-    fontSize: '13px',
-    color: '#111827',
-    outline: 'none',
-}
+type FormData = Omit<Discipline, 'id'>
+
+const emptyForm = (): FormData => ({
+    department_id: '', name: '', education_level: '1_Бакалавр (очна)',
+    semester: 1, total_hours: 0, lecture_hours: 0, group_hours: 0,
+    subgroup_hours: 0, tsz_hours: 0, practice_hours: 0,
+    course_works: 0, control_works: 0, exams: 0, credits: 0,
+    academic_year: ACADEMIC_YEAR,
+    student_count: 0, lecture_streams: 1, group_count: 1, subgroup_count: 0,
+    group_names: '', specialty_codes: '', is_thesis: true,
+})
 
 export default function DisciplinesPage() {
     const queryClient = useQueryClient()
-    const [showForm, setShowForm] = useState(false)
-    const [form, setForm] = useState(emptyForm)
-    const [filterDept, setFilterDept] = useState('')
+
+    const [selectedDept, setSelectedDept] = useState('')
+    const [selectedDiscId, setSelectedDiscId] = useState<string | null>(null)
+    const [discFilter, setDiscFilter] = useState('')
     const [filterLevel, setFilterLevel] = useState('')
-    const [filterForm, setFilterForm] = useState('')
-    const [filterSemester, setFilterSemester] = useState('')
-    const [showFilters, setShowFilters] = useState(false)
+    const [filterSem, setFilterSem] = useState<'' | '1' | '2'>('')
+    const [showAddForm, setShowAddForm] = useState(false)
+    const [addForm, setAddForm] = useState<FormData>(emptyForm())
+    const [editForm, setEditForm] = useState<FormData | null>(null)
+    const [isEditing, setIsEditing] = useState(false)
 
-    const { data: disciplines, isLoading } = useQuery({
-        queryKey: ['disciplines', filterDept],
-        queryFn: () => getDisciplines(filterDept || undefined),
+    const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: getDepartments })
+    useEffect(() => {
+        if (!selectedDept && departments?.length) {
+            const d = departments.find(d => d.number === '22')
+            if (d) setSelectedDept(d.id)
+        }
+    }, [departments])
+
+    const { data: disciplines = [], isLoading } = useQuery({
+        queryKey: ['disciplines', selectedDept],
+        queryFn: () => getDisciplines(selectedDept || undefined),
+        enabled: !!selectedDept,
     })
 
-    const { data: departments } = useQuery({
-        queryKey: ['departments'],
-        queryFn: getDepartments,
-    })
+    const invDisc = () => queryClient.invalidateQueries({ queryKey: ['disciplines', selectedDept] })
 
     const createMutation = useMutation({
-        mutationFn: () => createDiscipline({
-            department_id: form.department_id, name: form.name,
-            education_level: form.education_level, semester: form.semester,
-            total_hours: form.total_hours, lecture_hours: form.lecture_hours,
-            group_hours: form.group_hours, subgroup_hours: form.subgroup_hours,
-            tsz_hours: form.tsz_hours, practice_hours: form.practice_hours,
-            course_works: form.course_works, control_works: form.control_works,
-            exams: form.exams, credits: form.credits, academic_year: form.academic_year,
-            student_count: form.student_count, lecture_streams: form.lecture_streams,
-            group_count: form.group_count, subgroup_count: form.subgroup_count,
-        }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['disciplines'] })
-            setForm(emptyForm)
-            setShowForm(false)
-        },
+        mutationFn: () => createDiscipline(addForm),
+        onSuccess: () => { invDisc(); setAddForm(emptyForm()); setShowAddForm(false) },
+    })
+
+    const updateMutation = useMutation({
+        mutationFn: () => updateDiscipline(selectedDiscId!, editForm!),
+        onSuccess: () => { invDisc(); setIsEditing(false) },
     })
 
     const deleteMutation = useMutation({
         mutationFn: deleteDiscipline,
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['disciplines'] }),
+        onSuccess: () => { invDisc(); setSelectedDiscId(null); setIsEditing(false) },
     })
 
-    const numInput = (field: keyof typeof form, lbl: string) => (
+    const filteredDiscs = useMemo(() => disciplines.filter(d => {
+        if (filterLevel && !d.education_level.includes(filterLevel)) return false
+        if (filterSem === '1' && d.semester % 2 === 0) return false
+        if (filterSem === '2' && d.semester % 2 === 1) return false
+        if (discFilter && !d.name.toLowerCase().includes(discFilter.toLowerCase())) return false
+        return true
+    }), [disciplines, filterLevel, filterSem, discFilter])
+
+    const selectedDisc = disciplines.find(d => d.id === selectedDiscId) ?? null
+
+    const handleDiscClick = (disc: Discipline) => {
+        setSelectedDiscId(disc.id)
+        setIsEditing(false)
+        setEditForm({ ...disc })
+    }
+
+    const handleStartEdit = () => {
+        if (selectedDisc) { setEditForm({ ...selectedDisc }); setIsEditing(true) }
+    }
+
+    const handleCancelEdit = () => {
+        setIsEditing(false)
+        setEditForm(selectedDisc ? { ...selectedDisc } : null)
+    }
+
+    const numField = (
+        form: FormData, setter: (f: FormData) => void,
+        field: keyof FormData, label: string
+    ) => (
         <div key={field}>
-            <label style={labelStyle}>{lbl}</label>
-            <input
-                style={inputStyle} type="number" min={0}
+            <label style={labelStyle}>{label}</label>
+            <input style={inputStyle} type="number" min={0}
                 value={form[field] as number}
-                onChange={e => setForm({ ...form, [field]: Number(e.target.value) })}
+                onChange={e => setter({ ...form, [field]: Number(e.target.value) })}
             />
         </div>
     )
 
-    const preview = calculateWorkload({
-        lecture_hours: form.lecture_hours, group_hours: form.group_hours,
-        subgroup_hours: form.subgroup_hours, practice_hours: form.practice_hours,
-        course_works: form.course_works, control_works: form.control_works,
-        exams: form.exams, credits: form.credits,
-        lecture_streams: form.lecture_streams, group_count: form.group_count,
-        subgroup_count: form.subgroup_count, student_count: form.student_count,
-    })
-
-    const filteredDisciplines = disciplines?.filter(d => {
-        if (filterLevel && !d.education_level.includes(filterLevel)) return false
-        if (filterForm === 'ochna' && d.education_level.includes('заочна')) return false
-        if (filterForm === 'zaochna' && !d.education_level.includes('заочна')) return false
-        if (filterSemester && d.semester !== Number(filterSemester)) return false
-        return true
-    }) || []
-
-    const activeFilters = [filterLevel, filterForm, filterSemester].filter(Boolean).length
-
-    if (isLoading) return (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '80px' }}>Завантаження...</div>
-    )
+    const displayForm = isEditing && editForm ? editForm : selectedDisc
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
-                    <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>
-                        Дисципліни
-                    </h1>
-                    <p style={{ fontSize: '14px', color: '#6b7280' }}>
-                        Знайдено: {filteredDisciplines.length} з {disciplines?.length || 0}
-                    </p>
+                    <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>Дисципліни</h1>
+                    <p style={{ fontSize: '14px', color: '#6b7280' }}>Перегляд та редагування дисциплін · {ACADEMIC_YEAR}</p>
                 </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <button
-                        onClick={() => setShowFilters(!showFilters)}
-                        style={{
-                            padding: '10px 16px',
-                            background: activeFilters > 0 ? '#fff7ed' : '#f9fafb',
-                            border: `1px solid ${activeFilters > 0 ? '#fed7aa' : '#e5e7eb'}`,
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            color: activeFilters > 0 ? '#f97316' : '#6b7280',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                        }}
-                    >
-                        <Filter size={15} />
-                        Фільтри
-                        {activeFilters > 0 && (
-                            <span style={{ background: '#f97316', color: '#fff', borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '700' }}>
-                                {activeFilters}
-                            </span>
-                        )}
-                    </button>
-                    <button
-                        onClick={() => setShowForm(!showForm)}
-                        style={{ padding: '10px 20px', background: '#f97316', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}
-                    >
-                        {showForm ? <ChevronUp size={16} /> : <Plus size={16} />}
-                        Додати дисципліну
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Select
+                        value={selectedDept}
+                        onChange={v => { setSelectedDept(v); setSelectedDiscId(null); setIsEditing(false) }}
+                        placeholder="Всі кафедри"
+                        style={{ minWidth: '240px' }}
+                        options={[
+                            { value: '', label: 'Всі кафедри' },
+                            ...(departments?.map(d => ({ value: d.id, label: `Каф. №${d.number} — ${d.name}` })) ?? []),
+                        ]}
+                    />
+                    <Select
+                        value={filterLevel}
+                        onChange={setFilterLevel}
+                        placeholder="Всі рівні"
+                        style={{ minWidth: '160px' }}
+                        options={[
+                            { value: '', label: 'Всі рівні' },
+                            ...EDUCATION_LEVELS.map(l => ({ value: l.label.split(' ')[0], label: l.label })),
+                        ]}
+                    />
+                    <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '2px', gap: '2px' }}>
+                        {(['', '1', '2'] as const).map(v => (
+                            <button key={v} onClick={() => setFilterSem(v)}
+                                style={{
+                                    padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer',
+                                    fontSize: '12px', fontWeight: '500',
+                                    background: filterSem === v ? '#fff' : 'transparent',
+                                    color: filterSem === v ? '#111827' : '#6b7280',
+                                    boxShadow: filterSem === v ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                }}>
+                                {v === '' ? 'Всі' : v === '1' ? 'І сем.' : 'ІІ сем.'}
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={() => { setShowAddForm(v => !v); setSelectedDiscId(null) }}
+                        style={{ padding: '9px 16px', background: '#f97316', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {showAddForm ? <ChevronUp size={15} /> : <Plus size={15} />}
+                        Додати
                     </button>
                 </div>
             </div>
 
-            {/* Фільтри */}
-            {showFilters && (
-                <div style={{ ...card, padding: '20px', marginBottom: '16px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+            {/* Add form */}
+            {showAddForm && (
+                <div style={{ ...card, padding: '20px', marginBottom: '18px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '14px' }}>Нова дисципліна</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                         <div>
-                            <label style={labelStyle}>Кафедра</label>
-                            <select style={selectStyle} value={filterDept} onChange={e => setFilterDept(e.target.value)}>
-                                <option value="">Всі кафедри</option>
-                                {departments?.map(d => <option key={d.id} value={d.id}>№ {d.number} — {d.name}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label style={labelStyle}>Рівень підготовки</label>
-                            <select style={selectStyle} value={filterLevel} onChange={e => setFilterLevel(e.target.value)}>
-                                <option value="">Всі рівні</option>
-                                <option value="Бакалавр">Бакалавр</option>
-                                <option value="Магістр">Магістр</option>
-                                <option value="Доктор філософії">Доктор філософії</option>
-                                <option value="загальновійськова">Загальновійськова</option>
-                                <option value="Курси">Курси</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style={labelStyle}>Форма навчання</label>
-                            <select style={selectStyle} value={filterForm} onChange={e => setFilterForm(e.target.value)}>
-                                <option value="">Всі форми</option>
-                                <option value="ochna">Очна</option>
-                                <option value="zaochna">Заочна</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style={labelStyle}>Семестр</label>
-                            <select style={selectStyle} value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
-                                <option value="">Всі семестри</option>
-                                {[1,2,3,4,5,6,7,8,9,10].map(s => (
-                                    <option key={s} value={s}>Семестр {s}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-                    {activeFilters > 0 && (
-                        <button
-                            onClick={() => { setFilterLevel(''); setFilterForm(''); setFilterSemester(''); setFilterDept('') }}
-                            style={{ marginTop: '12px', padding: '6px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#dc2626' }}
-                        >
-                            Скинути фільтри
-                        </button>
-                    )}
-                </div>
-            )}
-
-            {/* Форма додавання */}
-            {showForm && (
-                <div style={{ ...card, padding: '24px', marginBottom: '20px' }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '20px' }}>
-                        Нова дисципліна
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                        <div style={{ gridColumn: '1 / -1' }}>
-                            <label style={labelStyle}>Назва дисципліни</label>
-                            <input style={inputStyle} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Наприклад: Вища математика" />
+                            <label style={labelStyle}>Назва</label>
+                            <input style={inputStyle} value={addForm.name} onChange={e => setAddForm({ ...addForm, name: e.target.value })} placeholder="Назва дисципліни" />
                         </div>
                         <div>
                             <label style={labelStyle}>Кафедра</label>
-                            <select style={inputStyle} value={form.department_id} onChange={e => setForm({ ...form, department_id: e.target.value })}>
-                                <option value="">Оберіть кафедру</option>
-                                {departments?.map(d => <option key={d.id} value={d.id}>№ {d.number} — {d.name}</option>)}
-                            </select>
+                            <Select
+                                value={addForm.department_id}
+                                onChange={v => setAddForm({ ...addForm, department_id: v })}
+                                placeholder="Оберіть"
+                                options={departments?.map(d => ({ value: d.id, label: `№${d.number} ${d.name}` })) ?? []}
+                            />
                         </div>
                         <div>
                             <label style={labelStyle}>Вид підготовки</label>
-                            <select style={inputStyle} value={form.education_level} onChange={e => setForm({ ...form, education_level: e.target.value })}>
-                                {EDUCATION_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label style={labelStyle}>Навчальний рік</label>
-                            <input style={inputStyle} value={form.academic_year} onChange={e => setForm({ ...form, academic_year: e.target.value })} />
+                            <Select
+                                value={addForm.education_level}
+                                onChange={v => setAddForm({ ...addForm, education_level: v })}
+                                options={EDUCATION_LEVELS.map(l => ({ value: l.value, label: l.label }))}
+                            />
                         </div>
                     </div>
-
-                    <p style={{ fontWeight: '600', fontSize: '12px', color: '#9ca3af', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        Години по навчальному плану
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '20px' }}>
-                        {numInput('semester', 'Семестр')}
-                        {numInput('lecture_hours', 'Лекції')}
-                        {numInput('group_hours', 'Групові')}
-                        {numInput('subgroup_hours', 'Підгрупові')}
-                        {numInput('practice_hours', 'Практика')}
-                        {numInput('course_works', 'Курсові')}
-                        {numInput('control_works', 'Контрольні')}
-                        {numInput('exams', 'Іспити')}
-                        {numInput('credits', 'Заліки')}
-                        {numInput('total_hours', 'Всього')}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px', marginBottom: '10px' }}>
+                        {numField(addForm, setAddForm, 'semester', 'Семестр')}
+                        {numField(addForm, setAddForm, 'lecture_hours', 'Лекції')}
+                        {numField(addForm, setAddForm, 'group_hours', 'ГЗ')}
+                        {numField(addForm, setAddForm, 'subgroup_hours', 'ПЗ')}
+                        {numField(addForm, setAddForm, 'practice_hours', 'Практика')}
+                        {numField(addForm, setAddForm, 'total_hours', 'Всього год')}
+                        {numField(addForm, setAddForm, 'exams', 'Іспити')}
+                        {numField(addForm, setAddForm, 'credits', 'Заліки')}
+                        {numField(addForm, setAddForm, 'course_works', 'Курсові')}
+                        {numField(addForm, setAddForm, 'control_works', 'Контрольні')}
+                        {numField(addForm, setAddForm, 'student_count', 'Курсантів')}
+                        {numField(addForm, setAddForm, 'group_count', 'Груп')}
                     </div>
-
-                    <p style={{ fontWeight: '600', fontSize: '12px', color: '#9ca3af', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        Параметри груп
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
-                        {numInput('student_count', 'Студентів')}
-                        {numInput('lecture_streams', 'Потоків')}
-                        {numInput('group_count', 'Груп')}
-                        {numInput('subgroup_count', 'Підгруп')}
-                    </div>
-
-                    <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-                        <p style={{ fontWeight: '600', fontSize: '12px', color: '#f97316', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            Розрахунок · Наказ №155/291 · Табл. 3
-                        </p>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
-                            {[
-                                ['Лекції', preview.lecture_workload],
-                                ['Групові', preview.group_workload],
-                                ['Підгрупові', preview.subgroup_workload],
-                                ['Консультації', preview.consultation_hours],
-                                ['Контрольні', preview.control_work_hours],
-                                ['Іспити', preview.exam_hours],
-                                ['Курсові', preview.course_work_hours],
-                                ['Заліки', preview.credit_hours],
-                            ].map(([lbl, value]) => (
-                                <div key={lbl as string} style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #fde8cc' }}>
-                                    <div style={{ color: '#9ca3af', fontSize: '12px' }}>{lbl}</div>
-                                    <div style={{ fontWeight: '600', color: '#111827', fontSize: '15px', marginTop: '2px' }}>{value}</div>
-                                </div>
-                            ))}
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                            <div style={{ padding: '12px 16px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '13px', color: '#3b82f6' }}>Загальний час</span>
-                                <span style={{ fontWeight: '700', color: '#1d4ed8', fontSize: '18px' }}>{preview.total_hours} год</span>
-                            </div>
-                            <div style={{ padding: '12px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '13px', color: '#16a34a' }}>Потреба в НПП</span>
-                                <span style={{ fontWeight: '700', color: '#15803d', fontSize: '18px' }}>{preview.required_staff}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        <button
-                            onClick={() => createMutation.mutate()}
-                            disabled={!form.name || !form.department_id || createMutation.isPending}
-                            style={{ padding: '10px 20px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
-                            <Save size={16} />
-                            {createMutation.isPending ? 'Збереження...' : 'Зберегти'}
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => createMutation.mutate()} disabled={!addForm.name || !addForm.department_id || createMutation.isPending}
+                            style={{ padding: '8px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Save size={14} /> {createMutation.isPending ? 'Збереження...' : 'Зберегти'}
                         </button>
-                        <button
-                            onClick={() => setShowForm(false)}
-                            style={{ padding: '10px 16px', background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
-                            <X size={16} /> Скасувати
+                        <button onClick={() => setShowAddForm(false)}
+                            style={{ padding: '8px 14px', background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                            Скасувати
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Список дисциплін */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {filteredDisciplines.length === 0 && (
-                    <div style={{ ...card, padding: '64px', textAlign: 'center' }}>
-                        <BookOpen size={48} style={{ margin: '0 auto 16px', opacity: 0.2, color: '#9ca3af' }} />
-                        <div style={{ fontSize: '15px', color: '#9ca3af' }}>
-                            {disciplines?.length === 0 ? 'Дисциплін ще немає' : 'Нічого не знайдено'}
-                        </div>
-                        <div style={{ fontSize: '13px', marginTop: '4px', color: '#d1d5db' }}>
-                            {disciplines?.length === 0 ? 'Додайте першу дисципліну' : 'Спробуйте змінити фільтри'}
+            {/* Main layout */}
+            <div style={{ display: 'grid', gridTemplateColumns: selectedDiscId ? '320px 1fr' : '1fr', gap: '16px', alignItems: 'start' }}>
+
+                {/* List */}
+                <div style={{ ...card, overflow: 'hidden', position: 'sticky', top: '72px' }}>
+                    <div style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6' }}>
+                        <div style={{ position: 'relative' }}>
+                            <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+                            <input value={discFilter} onChange={e => setDiscFilter(e.target.value)}
+                                placeholder={`Пошук серед ${filteredDiscs.length} дисциплін...`}
+                                style={{ ...inputStyle, paddingLeft: '30px' }} />
                         </div>
                     </div>
-                )}
-
-                {filteredDisciplines.map(d => {
-                    const dept = departments?.find(dep => dep.id === d.department_id)
-                    const calc = calculateWorkload({
-                        lecture_hours: d.lecture_hours, group_hours: d.group_hours,
-                        subgroup_hours: d.subgroup_hours, practice_hours: d.practice_hours,
-                        course_works: d.course_works, control_works: d.control_works,
-                        exams: d.exams, credits: d.credits,
-                        lecture_streams: 1, group_count: 1, subgroup_count: 1, student_count: 25,
-                    })
-
-                    const isZaochna = d.education_level.includes('заочна')
-                    const levelColor = d.education_level.includes('Магістр') ? '#8b5cf6'
-                        : d.education_level.includes('Доктор') ? '#ef4444'
-                            : d.education_level.includes('Курси') ? '#f59e0b'
-                                : isZaochna ? '#06b6d4' : '#3b82f6'
-
-                    return (
-                        <div key={d.id} style={{ ...card, padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1 }}>
-                                <div style={{ width: '4px', height: '40px', borderRadius: '2px', background: levelColor, flexShrink: 0 }} />
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>{d.name}</div>
-                                    <div style={{ display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
-                                        <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '4px', background: `${levelColor}18`, color: levelColor, fontWeight: '500', border: `1px solid ${levelColor}30` }}>
-                                            {d.education_level.replace(/^\d+_/, '')}
-                                        </span>
-                                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Сем. {d.semester}</span>
-                                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Каф. №{dept?.number}</span>
-                                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Лек: {d.lecture_hours}</span>
-                                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Груп: {d.group_hours}</span>
-                                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Підгр: {d.subgroup_hours}</span>
-                                        <span style={{ fontSize: '12px', color: '#f97316', fontWeight: '600' }}>{calc.total_hours} год</span>
+                    <div style={{ maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
+                        {isLoading && <div style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>Завантаження...</div>}
+                        {!isLoading && !selectedDept && (
+                            <div style={{ padding: '48px', textAlign: 'center' }}>
+                                <BookOpen size={40} style={{ margin: '0 auto 12px', opacity: 0.12, color: '#9ca3af' }} />
+                                <div style={{ fontSize: '14px', color: '#9ca3af' }}>Оберіть кафедру</div>
+                            </div>
+                        )}
+                        {!isLoading && selectedDept && filteredDiscs.length === 0 && (
+                            <div style={{ padding: '32px', textAlign: 'center', fontSize: '13px', color: '#9ca3af' }}>Дисциплін не знайдено</div>
+                        )}
+                        {filteredDiscs.map(disc => {
+                            const isSelected = disc.id === selectedDiscId
+                            return (
+                                <div key={disc.id} onClick={() => handleDiscClick(disc)}
+                                    style={{
+                                        padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f9fafb',
+                                        background: isSelected ? '#fff7ed' : 'transparent',
+                                        borderLeft: `3px solid ${isSelected ? '#f97316' : 'transparent'}`,
+                                        display: 'flex', alignItems: 'flex-start', gap: '8px',
+                                    }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: '13px', fontWeight: '500', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {disc.name}
+                                            {disc.is_thesis && (
+                                                <span style={{ fontSize: '10px', background: '#f3f4f6', color: '#6b7280', padding: '1px 5px', borderRadius: '4px', border: '1px solid #e5e7eb', flexShrink: 0, fontWeight: '600' }}>
+                                                    📋 Атестація
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
+                                            {disc.education_level.replace(/^\d+_/, '')} · Сем.{disc.semester} · {disc.student_count} ос.
+                                        </div>
                                     </div>
+                                    <button onClick={e => { e.stopPropagation(); if (confirm(`Видалити "${disc.name}"?`)) deleteMutation.mutate(disc.id) }}
+                                        style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '2px', flexShrink: 0, marginTop: '2px' }}>
+                                        <Trash2 size={13} />
+                                    </button>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {/* Detail / Edit panel */}
+                {selectedDisc && displayForm && (
+                    <div style={{ ...card, padding: '22px' }}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                            <div style={{ flex: 1, minWidth: 0, paddingRight: '12px' }}>
+                                {isEditing ? (
+                                    <input style={{ ...inputStyle, fontSize: '16px', fontWeight: '600' }}
+                                        value={editForm!.name}
+                                        onChange={e => setEditForm({ ...editForm!, name: e.target.value })} />
+                                ) : (
+                                    <h2 style={{ fontSize: '17px', fontWeight: '700', color: '#111827', margin: 0 }}>{selectedDisc.name}</h2>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                {!isEditing ? (
+                                    <button onClick={handleStartEdit}
+                                        style={{ padding: '7px 14px', background: '#eff6ff', color: '#3b82f6', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <Edit2 size={13} /> Редагувати
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}
+                                            style={{ padding: '7px 14px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                            <Save size={13} /> {updateMutation.isPending ? 'Збереження...' : 'Зберегти'}
+                                        </button>
+                                        <button onClick={handleCancelEdit}
+                                            style={{ padding: '7px 12px', background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                            <X size={13} /> Скасувати
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Top row: level + semester + academic year */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+                            <div>
+                                <label style={labelStyle}>Вид підготовки</label>
+                                {isEditing ? (
+                                    <Select
+                                        value={editForm!.education_level}
+                                        onChange={v => setEditForm({ ...editForm!, education_level: v })}
+                                        options={EDUCATION_LEVELS.map(l => ({ value: l.value, label: l.label }))}
+                                    />
+                                ) : (
+                                    <div style={{ padding: '8px 11px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px', color: '#374151', border: '1px solid #e5e7eb' }}>
+                                        {displayForm.education_level.replace(/^\d+_/, '')}
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Семестр</label>
+                                {isEditing ? (
+                                    <input style={inputStyle} type="number" min={1} max={10} value={editForm!.semester} onChange={e => setEditForm({ ...editForm!, semester: Number(e.target.value) })} />
+                                ) : (
+                                    <div style={{ padding: '8px 11px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px', color: '#374151', border: '1px solid #e5e7eb' }}>{displayForm.semester}</div>
+                                )}
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Навч. рік</label>
+                                <div style={{ padding: '8px 11px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px', color: '#374151', border: '1px solid #e5e7eb' }}>{displayForm.academic_year}</div>
+                            </div>
+                        </div>
+
+                        {/* Hours grid */}
+                        <div style={{ marginBottom: '6px' }}>
+                            <label style={{ ...labelStyle, marginBottom: '8px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Години</label>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '8px' }}>
+                                {([
+                                    ['lecture_hours', 'Лекції'],
+                                    ['group_hours', 'ГЗ'],
+                                    ['subgroup_hours', 'ПЗ'],
+                                    ['practice_hours', 'Практика'],
+                                    ['course_works', 'Курсові'],
+                                    ['control_works', 'Контрольні'],
+                                    ['exams', 'Іспити'],
+                                    ['credits', 'Заліки'],
+                                ] as [keyof FormData, string][]).map(([field, label]) => (
+                                    <div key={field}>
+                                        <label style={labelStyle}>{label}</label>
+                                        {isEditing ? (
+                                            <input style={inputStyle} type="number" min={0}
+                                                value={editForm![field] as number}
+                                                onChange={e => setEditForm({ ...editForm!, [field]: Number(e.target.value) })} />
+                                        ) : (
+                                            <div style={{ padding: '8px 11px', background: (displayForm[field] as number) > 0 ? '#eff6ff' : '#f9fafb', borderRadius: '8px', fontSize: '13px', fontWeight: (displayForm[field] as number) > 0 ? '600' : '400', color: (displayForm[field] as number) > 0 ? '#1d4ed8' : '#9ca3af', border: '1px solid #e5e7eb' }}>
+                                                {displayForm[field] as number}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                <div>
+                                    <label style={labelStyle}>Всього годин</label>
+                                    {isEditing ? (
+                                        <input style={{ ...inputStyle, fontWeight: '700' }} type="number" min={0} value={editForm!.total_hours} onChange={e => setEditForm({ ...editForm!, total_hours: Number(e.target.value) })} />
+                                    ) : (
+                                        <div style={{ padding: '8px 11px', background: '#f0fdf4', borderRadius: '8px', fontSize: '14px', fontWeight: '700', color: '#15803d', border: '1px solid #bbf7d0' }}>
+                                            {displayForm.total_hours} год
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <label style={labelStyle}>Кредитів ЄКТС</label>
+                                    {isEditing ? (
+                                        <input style={inputStyle} type="number" min={0} value={editForm!.credits} onChange={e => setEditForm({ ...editForm!, credits: Number(e.target.value) })} />
+                                    ) : (
+                                        <div style={{ padding: '8px 11px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px', color: '#374151', border: '1px solid #e5e7eb' }}>{displayForm.credits}</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={{ height: '1px', background: '#f3f4f6', margin: '16px 0' }} />
+
+                        {/* Groups / Students */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '14px' }}>
+                            {([
+                                ['student_count', 'Курсантів'],
+                                ['group_count', 'Груп'],
+                                ['lecture_streams', 'Потоків'],
+                                ['subgroup_count', 'Підгруп'],
+                            ] as [keyof FormData, string][]).map(([field, label]) => (
+                                <div key={field}>
+                                    <label style={labelStyle}>{label}</label>
+                                    {isEditing ? (
+                                        <input style={inputStyle} type="number" min={0}
+                                            value={editForm![field] as number}
+                                            onChange={e => setEditForm({ ...editForm!, [field]: Number(e.target.value) })} />
+                                    ) : (
+                                        <div style={{ padding: '8px 11px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#111827', border: '1px solid #e5e7eb' }}>
+                                            {displayForm[field] as number}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Specialty codes */}
+                        <div>
+                            <label style={labelStyle}>Коди спеціальностей</label>
+                            {isEditing ? (
+                                <input style={inputStyle} value={editForm!.specialty_codes || ''}
+                                    onChange={e => setEditForm({ ...editForm!, specialty_codes: e.target.value })}
+                                    placeholder="122,126" />
+                            ) : (
+                                <div style={{ padding: '8px 11px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px', color: displayForm.specialty_codes ? '#374151' : '#9ca3af', border: '1px solid #e5e7eb' }}>
+                                    {displayForm.specialty_codes || '—'}
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ height: '1px', background: '#f3f4f6', margin: '16px 0' }} />
+
+                        {/* Thesis toggle */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: displayForm.is_thesis ? '#f8fafc' : '#fafafa', borderRadius: '10px', border: `1px solid ${displayForm.is_thesis ? '#cbd5e1' : '#e5e7eb'}` }}>
+                            <div>
+                                <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>Атестаційна робота</div>
+                                <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>
+                                    {displayForm.is_thesis
+                                        ? 'Керівники призначаються через «Наукові роботи»'
+                                        : 'Розподіл викладачів через слоти на сторінці «Розподіл»'}
                                 </div>
                             </div>
                             <button
-                                onClick={() => deleteMutation.mutate(d.id)}
-                                style={{ padding: '8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#dc2626', display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '12px' }}
+                                onClick={() => {
+                                    const newVal = !displayForm.is_thesis
+                                    if (isEditing) {
+                                        setEditForm(f => f ? { ...f, is_thesis: newVal } : f)
+                                    } else {
+                                        updateDiscipline(selectedDiscId!, { is_thesis: newVal })
+                                            .then(() => queryClient.invalidateQueries({ queryKey: ['disciplines', selectedDept] }))
+                                    }
+                                }}
+                                style={{
+                                    width: '44px', height: '24px', borderRadius: '12px', border: 'none',
+                                    background: displayForm.is_thesis ? '#6b7280' : '#e5e7eb',
+                                    cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                                }}
                             >
-                                <Trash2 size={15} />
+                                <span style={{
+                                    position: 'absolute', top: '3px',
+                                    left: displayForm.is_thesis ? '23px' : '3px',
+                                    width: '18px', height: '18px', borderRadius: '50%',
+                                    background: '#fff', transition: 'left 0.2s',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                }} />
                             </button>
                         </div>
-                    )
-                })}
+                    </div>
+                )}
             </div>
         </div>
     )

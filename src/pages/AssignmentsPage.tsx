@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDepartments } from '../services/departments'
 import { getStaff } from '../services/staff'
@@ -7,12 +7,13 @@ import { getAssignments, createAssignment, deleteAssignment, getStaffWorkloadSum
 import { calculateWorkload, getStaffHourLimit } from '../utils/workload'
 import { exportDepartmentExcel } from '../utils/reports'
 import { ClipboardList, UserCheck, BookOpen, AlertTriangle, CheckCircle, FileDown, Filter, X } from 'lucide-react'
+import Select from '../components/Select'
 
 const card = {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '16px',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.08)',
 }
 
 const selectStyle = {
@@ -34,6 +35,12 @@ export default function AssignmentsPage() {
     const academicYear = '2025-2026'
 
     const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: getDepartments })
+    useEffect(() => {
+        if (!selectedDept && departments?.length) {
+            const d = departments.find(d => d.number === '22')
+            if (d) setSelectedDept(d.id)
+        }
+    }, [departments])
     const { data: staff } = useQuery({ queryKey: ['staff', selectedDept], queryFn: () => getStaff(selectedDept || undefined), enabled: !!selectedDept })
     const { data: disciplines } = useQuery({ queryKey: ['disciplines', selectedDept], queryFn: () => getDisciplines(selectedDept || undefined), enabled: !!selectedDept })
     const { data: assignments } = useQuery({ queryKey: ['assignments', selectedDept], queryFn: () => getAssignments(selectedDept || undefined), enabled: !!selectedDept })
@@ -117,14 +124,13 @@ export default function AssignmentsPage() {
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <select
+                    <Select
                         value={selectedDept}
-                        onChange={e => setSelectedDept(e.target.value)}
-                        style={{ padding: '10px 14px', background: '#f9fafb', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', color: '#111827', outline: 'none', minWidth: '260px' }}
-                    >
-                        <option value="">Оберіть кафедру</option>
-                        {departments?.map(d => <option key={d.id} value={d.id}>Кафедра № {d.number} — {d.name}</option>)}
-                    </select>
+                        onChange={setSelectedDept}
+                        placeholder="Оберіть кафедру"
+                        style={{ minWidth: '260px' }}
+                        options={departments?.map(d => ({ value: d.id, label: `Кафедра № ${d.number} — ${d.name}` })) ?? []}
+                    />
                     {selectedDept && (
                         <button
                             onClick={handleExcelExport}
@@ -246,25 +252,23 @@ export default function AssignmentsPage() {
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-                            <select style={selectStyle} value={filterLevel} onChange={e => setFilterLevel(e.target.value)}>
-                                <option value="">Всі рівні</option>
-                                <option value="Бакалавр">Бакалавр</option>
-                                <option value="Магістр">Магістр</option>
-                                <option value="Доктор">Доктор філос.</option>
-                                <option value="загальновійськова">Загальновійськ.</option>
-                                <option value="Курси">Курси</option>
-                            </select>
-                            <select style={selectStyle} value={filterForm} onChange={e => setFilterForm(e.target.value)}>
-                                <option value="">Всі форми</option>
-                                <option value="ochna">Очна</option>
-                                <option value="zaochna">Заочна</option>
-                            </select>
-                            <select style={selectStyle} value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
-                                <option value="">Всі семестри</option>
-                                {[1,2,3,4,5,6,7,8,9,10,11,12].map(s => (
-                                    <option key={s} value={s}>Семестр {s}</option>
-                                ))}
-                            </select>
+                            <Select value={filterLevel} onChange={setFilterLevel} options={[
+                                { value: '', label: 'Всі рівні' },
+                                { value: 'Бакалавр', label: 'Бакалавр' },
+                                { value: 'Магістр', label: 'Магістр' },
+                                { value: 'Доктор', label: 'Доктор філос.' },
+                                { value: 'загальновійськова', label: 'Загальновійськ.' },
+                                { value: 'Курси', label: 'Курси' },
+                            ]} />
+                            <Select value={filterForm} onChange={setFilterForm} options={[
+                                { value: '', label: 'Всі форми' },
+                                { value: 'ochna', label: 'Очна' },
+                                { value: 'zaochna', label: 'Заочна' },
+                            ]} />
+                            <Select value={filterSemester} onChange={setFilterSemester} options={[
+                                { value: '', label: 'Всі семестри' },
+                                ...[1,2,3,4,5,6,7,8,9,10,11,12].map(s => ({ value: String(s), label: `Семестр ${s}` })),
+                            ]} />
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', paddingRight: '4px' }}>
