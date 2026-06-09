@@ -192,7 +192,7 @@ export default function ImportPage() {
                 })
                 // Авто-прив'язка груп по кодах спеціальностей та курсу (семестр→курс)
                 if (updated[i].specialty_codes) {
-                    await autoLinkGroupsBySpecialty(discId, updated[i].specialty_codes, updated[i].semester, academicYear)
+                    await autoLinkGroupsBySpecialty(discId, updated[i].specialty_codes, updated[i].semester, academicYear, updated[i].education_level.includes('заочна'))
                 }
                 updated[i] = { ...updated[i], status: 'imported' }
             } catch {

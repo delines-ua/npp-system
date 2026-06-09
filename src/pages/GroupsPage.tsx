@@ -26,7 +26,7 @@ const DEFAULT_YEAR = '2025-2026'
 
 const emptyForm = (): InstituteGroupInput => ({
     group_name: '', faculty: 1, course: 1, student_count: 0,
-    is_masters: false, specialty_code: '', academic_year: DEFAULT_YEAR,
+    is_masters: false, specialty_code: '', zaochna: false, academic_year: DEFAULT_YEAR,
 })
 
 const courseLabel = (g: { course: number; is_masters: boolean }) =>
@@ -123,7 +123,7 @@ export default function GroupsPage() {
         setEditForm({
             group_name: g.group_name, faculty: g.faculty, course: g.course,
             student_count: g.student_count, is_masters: g.is_masters,
-            specialty_code: g.specialty_code, academic_year: g.academic_year,
+            specialty_code: g.specialty_code, zaochna: g.zaochna, academic_year: g.academic_year,
         })
     }
 
@@ -265,8 +265,9 @@ function GroupFields({ form, setForm, courseOptions, mastersOptions }: {
     courseOptions: { value: string; label: string }[]
     mastersOptions: { value: string; label: string }[]
 }) {
+    const formOptions = [{ value: 'false', label: 'Очна' }, { value: 'true', label: 'Заочна' }]
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '10px' }}>
             <div>
                 <label style={lbl}>Назва групи</label>
                 <input style={inputStyle} value={form.group_name} onChange={e => setForm({ ...form, group_name: e.target.value })} placeholder="161" />
@@ -282,6 +283,10 @@ function GroupFields({ form, setForm, courseOptions, mastersOptions }: {
             <div>
                 <label style={lbl}>Рівень</label>
                 <Select value={form.is_masters ? 'true' : 'false'} onChange={v => setForm({ ...form, is_masters: v === 'true' })} options={mastersOptions} />
+            </div>
+            <div>
+                <label style={lbl}>Форма</label>
+                <Select value={form.zaochna ? 'true' : 'false'} onChange={v => setForm({ ...form, zaochna: v === 'true' })} options={formOptions} />
             </div>
             <div>
                 <label style={lbl}>Спеціальність</label>
@@ -330,7 +335,7 @@ function ImportPanel({ onDone, defaultYear }: { onDone: () => void; defaultYear:
     const handleImport = async () => {
         setImporting(true); setError('')
         try {
-            const payload: InstituteGroupInput[] = visible.map(({ zaochna, ...g }) => ({ ...g, academic_year: year }))
+            const payload: InstituteGroupInput[] = visible.map(g => ({ ...g, academic_year: year }))
             setResult(await upsertInstituteGroups(payload))
             onDone()
         } catch {

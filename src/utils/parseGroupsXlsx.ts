@@ -1,9 +1,8 @@
 import * as XLSX from 'xlsx'
 import type { InstituteGroupInput } from '../services/instituteGroups'
 
-export interface ParsedGroup extends InstituteGroupInput {
-    zaochna: boolean   // заочна форма (визначається за макетом/назвою) — у БД не зберігається
-}
+// zaochna (форма навчання) входить до InstituteGroupInput і зберігається в БД
+export type ParsedGroup = InstituteGroupInput
 
 // Блоки "року навчання" у макеті Додатка 2:
 // [перша колонка блоку ("Курс"), курс (1–4/1–2), магістратура?]

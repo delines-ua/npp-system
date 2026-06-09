@@ -9,6 +9,10 @@ ALTER TABLE institute_groups ADD COLUMN IF NOT EXISTS specialty_code text DEFAUL
 -- Крок 2: Додати колонку specialty_codes до disciplines (якщо не існує)
 ALTER TABLE disciplines ADD COLUMN IF NOT EXISTS specialty_codes text DEFAULT '';
 
+-- Крок 2.1: Форма навчання групи (true = заочна, false = очна).
+-- Потрібна, щоб авто-підбір груп розрізняв очні (241) та заочні (2401) групи.
+ALTER TABLE institute_groups ADD COLUMN IF NOT EXISTS zaochna boolean DEFAULT false;
+
 -- ============================================================
 -- Крок 3: Очистити та заповнити institute_groups (2025-2026)
 -- ============================================================

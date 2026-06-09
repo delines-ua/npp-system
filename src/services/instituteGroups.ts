@@ -170,11 +170,14 @@ export const updateDisciplineGroupCount = async (id: string, disciplineId: strin
 
 // Авто-зв'язок: знаходить групи по кодах спеціальностей і прив'язує до дисципліни
 // semester → course: 1-2→1, 3-4→2, 5-6→3, 7-8→4
+// isZaochna — форма навчання дисципліни: підбираємо лише групи тієї ж форми
+// (очна дисципліна → лише очні групи 241/242, заочна → лише заочні 2401).
 export const autoLinkGroupsBySpecialty = async (
     disciplineId: string,
     specialtyCodes: string,   // "122,126"
     semester = 0,
-    academicYear = '2025-2026'
+    academicYear = '2025-2026',
+    isZaochna = false
 ): Promise<number> => {
     if (!specialtyCodes.trim()) return 0
 
@@ -193,6 +196,7 @@ export const autoLinkGroupsBySpecialty = async (
         .in('specialty_code', codes)
         .eq('academic_year', academicYear)
         .eq('is_masters', isMasters)
+        .eq('zaochna', isZaochna)
     if (course > 0) query = query.eq('course', course)
     const { data: groups, error } = await query.order('group_name')
     if (error) throw error

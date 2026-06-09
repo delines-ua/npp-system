@@ -119,6 +119,7 @@ export interface InstituteGroup {
     student_count: number
     is_masters: boolean
     specialty_code: string  // "122", "126" — код спеціальності групи
+    zaochna: boolean        // форма навчання: true = заочна, false = очна
     academic_year: string
     created_at: string
 }

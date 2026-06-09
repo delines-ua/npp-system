@@ -178,7 +178,8 @@ export default function WorkloadDistributionPage() {
     const autoLinkMutation = useMutation({
         mutationFn: () => {
             const codes = selectedDisc?.specialty_codes ?? ''
-            return autoLinkGroupsBySpecialty(selectedDiscId!, codes, selectedDisc?.semester ?? 0, ACADEMIC_YEAR)
+            const isZaochna = (selectedDisc?.education_level ?? '').includes('заочна')
+            return autoLinkGroupsBySpecialty(selectedDiscId!, codes, selectedDisc?.semester ?? 0, ACADEMIC_YEAR, isZaochna)
         },
         onSuccess: (count) => {
             invalidateDiscGroups()
