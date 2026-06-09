@@ -12,8 +12,6 @@ import type { ScientificWorkType } from '../utils/lawNorms'
 import { GraduationCap, Plus, Trash2, AlertTriangle } from 'lucide-react'
 import Select from '../components/Select'
 
-const ACADEMIC_YEAR = '2025-2026'
-
 const card: React.CSSProperties = {
     background: '#ffffff', border: '1px solid #e5e7eb',
     borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.08)',
@@ -26,7 +24,7 @@ const selectStyle: React.CSSProperties = {
 
 export default function ScientificWorksPage() {
     const queryClient = useQueryClient()
-    const { settings } = useSettings()
+    const { settings, academicYear: ACADEMIC_YEAR } = useSettings()
     const [selectedDept, setSelectedDept] = useState('')
     const [addForm, setAddForm] = useState<{ staffId: string; type: ScientificWorkType; count: string; notes: string }>({
         staffId: '', type: 'bachelor_thesis', count: '', notes: '',
@@ -47,15 +45,15 @@ export default function ScientificWorksPage() {
     })
 
     const { data: disciplines = [] } = useQuery({
-        queryKey: ['disciplines', selectedDept],
-        queryFn: () => getDisciplines(selectedDept || undefined),
+        queryKey: ['disciplines', selectedDept, ACADEMIC_YEAR],
+        queryFn: () => getDisciplines(selectedDept || undefined, ACADEMIC_YEAR),
         enabled: !!selectedDept,
     })
 
     const discIds = useMemo(() => disciplines.map(d => d.id), [disciplines])
 
     const { data: detailedAssignments = [] } = useQuery({
-        queryKey: ['detailed-assignments', selectedDept],
+        queryKey: ['detailed-assignments', selectedDept, ACADEMIC_YEAR, discIds.join(',')],
         queryFn: () => getDetailedAssignments(discIds),
         enabled: !!selectedDept && discIds.length > 0,
     })

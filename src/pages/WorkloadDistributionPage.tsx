@@ -23,8 +23,7 @@ import {
 import type { Discipline, Staff, WorkloadTypeKey } from '../types/database'
 import { Layers, Search, UserCheck, Users, Plus, X, ChevronDown, ExternalLink } from 'lucide-react'
 import Select from '../components/Select'
-
-const ACADEMIC_YEAR = '2025-2026'
+import { useSettings } from '../contexts/SettingsContext'
 
 const card = {
     background: '#ffffff',
@@ -46,6 +45,7 @@ const WORKLOAD_TYPE_COLOR: Record<string, string> = {
 
 export default function WorkloadDistributionPage() {
     const queryClient = useQueryClient()
+    const { academicYear: ACADEMIC_YEAR } = useSettings()
     const [selectedDept, setSelectedDept] = useState('')
     const [selectedDiscId, setSelectedDiscId] = useState<string | null>(null)
     const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
@@ -85,15 +85,15 @@ export default function WorkloadDistributionPage() {
         enabled: !!selectedDept,
     })
     const { data: disciplines = [] } = useQuery({
-        queryKey: ['disciplines', selectedDept],
-        queryFn: () => getDisciplines(selectedDept || undefined),
+        queryKey: ['disciplines', selectedDept, ACADEMIC_YEAR],
+        queryFn: () => getDisciplines(selectedDept || undefined, ACADEMIC_YEAR),
         enabled: !!selectedDept,
     })
 
     const discIds = useMemo(() => disciplines.map(d => d.id), [disciplines])
 
     const { data: assignments = [] } = useQuery({
-        queryKey: ['detailed-assignments', selectedDept],
+        queryKey: ['detailed-assignments', selectedDept, ACADEMIC_YEAR, discIds.join(',')],
         queryFn: () => getDetailedAssignments(discIds),
         enabled: !!selectedDept && discIds.length > 0,
     })
@@ -132,6 +132,22 @@ export default function WorkloadDistributionPage() {
         onSuccess: invalidateAssignments,
     })
 
+    // Призначити обраного викладача на ВСІ слоти дисципліни (крім тих, що вже його)
+    const assignAllMutation = useMutation({
+        mutationFn: async () => {
+            if (!selectedStaffId || !selectedDisc) return
+            for (const slot of slots) {
+                const existing = getSlotAssignment(slot.type, slot.groupNumber)
+                if (existing?.staff_id === selectedStaffId) continue
+                await assignSlot(
+                    selectedDisc.id, selectedStaffId, slot.type, slot.groupNumber,
+                    slot.hours, slot.studentCount, ACADEMIC_YEAR,
+                )
+            }
+        },
+        onSuccess: invalidateAssignments,
+    })
+
     const deleteMutation = useMutation({
         mutationFn: deleteDetailedAssignment,
         onSuccess: invalidateAssignments,
@@ -162,7 +178,7 @@ export default function WorkloadDistributionPage() {
     const autoLinkMutation = useMutation({
         mutationFn: () => {
             const codes = selectedDisc?.specialty_codes ?? ''
-            return autoLinkGroupsBySpecialty(selectedDiscId!, codes, selectedDisc?.semester ?? 0)
+            return autoLinkGroupsBySpecialty(selectedDiscId!, codes, selectedDisc?.semester ?? 0, ACADEMIC_YEAR)
         },
         onSuccess: (count) => {
             invalidateDiscGroups()
@@ -804,10 +820,26 @@ export default function WorkloadDistributionPage() {
                             {/* Workload slots */}
                             {slots.length > 0 && (
                                 <div style={card}>
-                                    <div style={{ padding: '14px 20px', borderBottom: '1px solid #f3f4f6' }}>
+                                    <div style={{ padding: '14px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                                         <span style={{ fontSize: '13px', fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                             Призначення {selectedStaff ? `— ${selectedStaff.full_name}` : '(оберіть викладача вище)'}
                                         </span>
+                                        {selectedStaff && (
+                                            <button
+                                                disabled={assignAllMutation.isPending || assignMutation.isPending || clearMutation.isPending}
+                                                onClick={() => assignAllMutation.mutate()}
+                                                style={{
+                                                    padding: '6px 14px', borderRadius: '8px', border: '1px solid #16a34a',
+                                                    background: '#16a34a', color: '#fff', fontSize: '12px', fontWeight: '600',
+                                                    cursor: assignAllMutation.isPending ? 'default' : 'pointer',
+                                                    display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
+                                                    opacity: assignAllMutation.isPending ? 0.6 : 1,
+                                                }}
+                                            >
+                                                <UserCheck size={14} />
+                                                {assignAllMutation.isPending ? 'Призначення…' : 'Призначити все'}
+                                            </button>
+                                        )}
                                     </div>
                                     <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         {(() => {

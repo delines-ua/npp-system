@@ -7,6 +7,7 @@ import {
     type InstituteGroupInput,
 } from '../services/instituteGroups'
 import { parseGroupsSheet, detectAcademicYear, type ParsedGroup } from '../utils/parseGroupsXlsx'
+import { useSettings } from '../contexts/SettingsContext'
 import type { InstituteGroup } from '../types/database'
 import { Layers, Plus, Trash2, Save, X, Edit2, Search, Upload, FileSpreadsheet, ChevronUp, GraduationCap, Users, Filter } from 'lucide-react'
 import Select from '../components/Select'
@@ -35,6 +36,7 @@ const courseKey = (g: { course: number; is_masters: boolean }) => `${g.course}|$
 
 export default function GroupsPage() {
     const queryClient = useQueryClient()
+    const { academicYear } = useSettings()
     const [search, setSearch] = useState('')
     const [facultyFilter, setFacultyFilter] = useState('')
     const [courseFilter, setCourseFilter] = useState('')      // ключ "курс|магістр", напр. "4|false"
@@ -50,7 +52,7 @@ export default function GroupsPage() {
     const inv = () => queryClient.invalidateQueries({ queryKey: ['institute-groups'] })
 
     const createMut = useMutation({
-        mutationFn: () => createInstituteGroup(addForm),
+        mutationFn: () => createInstituteGroup({ ...addForm, academic_year: academicYear }),
         onSuccess: () => { inv(); setAddForm(emptyForm()); setShowAddForm(false) },
     })
     const updateMut = useMutation({
@@ -174,7 +176,7 @@ export default function GroupsPage() {
             </div>
 
             {/* Import panel */}
-            {showImport && <ImportPanel onDone={inv} />}
+            {showImport && <ImportPanel onDone={inv} defaultYear={academicYear} />}
 
             {/* Add form */}
             {showAddForm && (
@@ -294,11 +296,11 @@ function GroupFields({ form, setForm, courseOptions, mastersOptions }: {
 }
 
 // ── Панель імпорту з Excel (Додаток 2) ───────────────────────────────────────
-function ImportPanel({ onDone }: { onDone: () => void }) {
+function ImportPanel({ onDone, defaultYear }: { onDone: () => void; defaultYear: string }) {
     const fileRef = useRef<HTMLInputElement>(null)
     const [fileName, setFileName] = useState('')
     const [parsed, setParsed] = useState<ParsedGroup[]>([])
-    const [year, setYear] = useState(DEFAULT_YEAR)
+    const [year, setYear] = useState(defaultYear)
     const [includeZaochna, setIncludeZaochna] = useState(true)
     const [importing, setImporting] = useState(false)
     const [result, setResult] = useState<{ inserted: number; updated: number } | null>(null)

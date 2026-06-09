@@ -7,8 +7,7 @@ import { getDetailedAssignments } from '../services/workloadAssignments'
 import { getDisciplineStatus, getStaffHourLimit } from '../utils/workload'
 import { Users, BookOpen, Clock, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
-
-const ACADEMIC_YEAR = '2025-2026'
+import { useSettings } from '../contexts/SettingsContext'
 
 const card: React.CSSProperties = {
     background: '#ffffff',
@@ -30,9 +29,10 @@ const TYPE_COLORS: Record<string, string> = {
 const PIE_COLORS = ['#f97316', '#3b82f6', '#22c55e', '#8b5cf6', '#06b6d4', '#f59e0b']
 
 export default function DashboardPage() {
+    const { academicYear } = useSettings()
     const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: getDepartments })
     const { data: staff } = useQuery({ queryKey: ['staff'], queryFn: () => getStaff() })
-    const { data: disciplines } = useQuery({ queryKey: ['disciplines'], queryFn: () => getDisciplines() })
+    const { data: disciplines } = useQuery({ queryKey: ['disciplines', academicYear], queryFn: () => getDisciplines(undefined, academicYear) })
 
     const discIdsKey = useMemo(() => disciplines?.map(d => d.id).join(',') || '', [disciplines])
     const discIds = useMemo(() => disciplines?.map(d => d.id) || [], [disciplines])
@@ -152,7 +152,7 @@ export default function DashboardPage() {
             <div style={{ marginBottom: '24px' }}>
                 <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>Дашборд</h1>
                 <p style={{ fontSize: '14px', color: '#6b7280' }}>
-                    {ACADEMIC_YEAR} навчальний рік · ВІТІ імені Героїв Крут
+                    {academicYear} навчальний рік · ВІТІ імені Героїв Крут
                 </p>
             </div>
 

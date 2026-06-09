@@ -6,6 +6,7 @@ import { upsertDiscipline } from '../services/disciplines'
 import { autoLinkGroupsBySpecialty } from '../services/instituteGroups'
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Play, Link } from 'lucide-react'
 import Select from '../components/Select'
+import { useSettings } from '../contexts/SettingsContext'
 
 const card = {
     background: '#ffffff',
@@ -37,6 +38,7 @@ interface ParsedDiscipline {
 }
 
 export default function ImportPage() {
+    const { academicYear } = useSettings()
     const fileRef = useRef<HTMLInputElement>(null)
     const [fileName, setFileName] = useState('')
     const [sheetNames, setSheetNames] = useState<string[]>([])
@@ -182,7 +184,7 @@ export default function ImportPage() {
                     tsz_hours: 0, practice_hours: updated[i].practice_hours,
                     course_works: updated[i].course_works, control_works: updated[i].control_works,
                     exams: updated[i].exams, credits: updated[i].credits,
-                    academic_year: '2025-2026', student_count: updated[i].student_count,
+                    academic_year: academicYear, student_count: updated[i].student_count,
                     lecture_streams: updated[i].lecture_streams, group_count: updated[i].group_count,
                     subgroup_count: updated[i].subgroup_count,
                     group_names: '',
@@ -190,7 +192,7 @@ export default function ImportPage() {
                 })
                 // Авто-прив'язка груп по кодах спеціальностей та курсу (семестр→курс)
                 if (updated[i].specialty_codes) {
-                    await autoLinkGroupsBySpecialty(discId, updated[i].specialty_codes, updated[i].semester)
+                    await autoLinkGroupsBySpecialty(discId, updated[i].specialty_codes, updated[i].semester, academicYear)
                 }
                 updated[i] = { ...updated[i], status: 'imported' }
             } catch {

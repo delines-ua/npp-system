@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-import { Upload, Layers, Boxes, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Upload, Layers, Boxes, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 import {
     LayoutDashboard, Building2, Users, BookOpen,
     GraduationCap, Bot, Settings,
 } from 'lucide-react'
+import Select from './Select'
+import { useSettings } from '../contexts/SettingsContext'
+import { ACADEMIC_YEARS } from '../utils/settings'
 
 const links = [
     { to: '/dashboard',        label: 'Дашборд',          icon: LayoutDashboard },
@@ -24,6 +27,7 @@ const SIDEBAR_MINI = 64
 
 export default function Layout() {
     const [collapsed, setCollapsed] = useState(false)
+    const { academicYear, setAcademicYear } = useSettings()
 
     const sideW = collapsed ? SIDEBAR_MINI : SIDEBAR_FULL
     const mainML = sideW + 24  // 12px gap on each side
@@ -162,6 +166,12 @@ export default function Layout() {
                 }}>
                     <div style={{ fontSize: '13px', color: '#9ca3af' }}>
                         Військовий інститут телекомунікацій та інформатизації імені Героїв Крут
+                    </div>
+                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <CalendarDays size={15} color="#9ca3af" />
+                        <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 500 }}>Навч. рік</span>
+                        <Select value={academicYear} onChange={setAcademicYear}
+                            options={ACADEMIC_YEARS.map(y => ({ value: y, label: y }))} style={{ minWidth: '130px' }} />
                     </div>
                 </header>
 

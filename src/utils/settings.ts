@@ -18,6 +18,28 @@ export const DEFAULT_WORKLOAD_SETTINGS: WorkloadSettings = {
     overrideMilitary: 550,
 }
 
+// ─── Обраний навчальний рік (глобальний для UI) ──────────────────────────────
+export const ACADEMIC_YEARS = ['2024-2025', '2025-2026', '2026-2027', '2027-2028']
+export const DEFAULT_ACADEMIC_YEAR = '2026-2027'
+
+const YEAR_KEY = 'npp.academicYear'
+
+export const loadAcademicYear = (): string => {
+    try {
+        return localStorage.getItem(YEAR_KEY) || DEFAULT_ACADEMIC_YEAR
+    } catch {
+        return DEFAULT_ACADEMIC_YEAR
+    }
+}
+
+export const saveAcademicYear = (year: string): void => {
+    try {
+        localStorage.setItem(YEAR_KEY, year)
+    } catch {
+        // ignore
+    }
+}
+
 const STORAGE_KEY = 'npp.workloadSettings'
 
 export const loadSettings = (): WorkloadSettings => {

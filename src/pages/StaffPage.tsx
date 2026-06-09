@@ -45,7 +45,7 @@ const emptyForm = (): FormData => ({
 
 export default function StaffPage() {
     const queryClient = useQueryClient()
-    const { settings } = useSettings()
+    const { settings, academicYear } = useSettings()
     const [selectedDept, setSelectedDept] = useState('')
     const [search, setSearch] = useState('')
     const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
@@ -68,27 +68,27 @@ export default function StaffPage() {
     })
 
     const { data: staffAssignments = [] } = useQuery({
-        queryKey: ['staff-assignments', selectedStaffId],
-        queryFn: () => getAssignmentsByStaff(selectedStaffId!),
+        queryKey: ['staff-assignments', selectedStaffId, academicYear],
+        queryFn: () => getAssignmentsByStaff(selectedStaffId!, academicYear),
         enabled: !!selectedStaffId,
     })
 
     const { data: staffWorks = [] } = useQuery({
-        queryKey: ['staff-scientific-works', selectedStaffId],
-        queryFn: () => getScientificWorksByStaff(selectedStaffId!, '2025-2026'),
+        queryKey: ['staff-scientific-works', selectedStaffId, academicYear],
+        queryFn: () => getScientificWorksByStaff(selectedStaffId!, academicYear),
         enabled: !!selectedStaffId,
     })
 
     const { data: allDisciplines = [] } = useQuery({
-        queryKey: ['disciplines-all'],
-        queryFn: () => getDisciplines(),
+        queryKey: ['disciplines-all', academicYear],
+        queryFn: () => getDisciplines(undefined, academicYear),
     })
 
     const staffIds = useMemo(() => staff.map(s => s.id), [staff])
 
     const { data: deptAssignments = [] } = useQuery({
-        queryKey: ['dept-assignments', staffIds],
-        queryFn: () => getAssignmentsByStaffIds(staffIds),
+        queryKey: ['dept-assignments', staffIds, academicYear],
+        queryFn: () => getAssignmentsByStaffIds(staffIds, academicYear),
         enabled: staffIds.length > 0,
     })
 
@@ -440,7 +440,7 @@ export default function StaffPage() {
                         {/* Workload card */}
                         <div style={{ ...card, padding: '18px 20px' }}>
                             <div style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                                Навантаження 2025-2026 · загальне
+                                Навантаження {academicYear} · загальне
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                                 <div style={{ flex: 1, height: '8px', background: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>

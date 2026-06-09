@@ -8,6 +8,7 @@ import { calculateWorkload, getStaffHourLimit } from '../utils/workload'
 import { exportDepartmentExcel } from '../utils/reports'
 import { ClipboardList, UserCheck, BookOpen, AlertTriangle, CheckCircle, FileDown, Filter, X } from 'lucide-react'
 import Select from '../components/Select'
+import { useSettings } from '../contexts/SettingsContext'
 
 const card = {
     background: '#ffffff',
@@ -32,7 +33,7 @@ export default function AssignmentsPage() {
     const [filterLevel, setFilterLevel] = useState('')
     const [filterForm, setFilterForm] = useState('')
     const [filterSemester, setFilterSemester] = useState('')
-    const academicYear = '2025-2026'
+    const { academicYear } = useSettings()
 
     const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: getDepartments })
     useEffect(() => {
@@ -42,9 +43,9 @@ export default function AssignmentsPage() {
         }
     }, [departments])
     const { data: staff } = useQuery({ queryKey: ['staff', selectedDept], queryFn: () => getStaff(selectedDept || undefined), enabled: !!selectedDept })
-    const { data: disciplines } = useQuery({ queryKey: ['disciplines', selectedDept], queryFn: () => getDisciplines(selectedDept || undefined), enabled: !!selectedDept })
+    const { data: disciplines } = useQuery({ queryKey: ['disciplines', selectedDept, academicYear], queryFn: () => getDisciplines(selectedDept || undefined, academicYear), enabled: !!selectedDept })
     const { data: assignments } = useQuery({ queryKey: ['assignments', selectedDept], queryFn: () => getAssignments(selectedDept || undefined), enabled: !!selectedDept })
-    const { data: workloadSummary } = useQuery({ queryKey: ['workload-summary', selectedDept], queryFn: () => getStaffWorkloadSummary(selectedDept, academicYear), enabled: !!selectedDept })
+    const { data: workloadSummary } = useQuery({ queryKey: ['workload-summary', selectedDept, academicYear], queryFn: () => getStaffWorkloadSummary(selectedDept, academicYear), enabled: !!selectedDept })
 
     const createMutation = useMutation({
         mutationFn: createAssignment,
@@ -99,7 +100,7 @@ export default function AssignmentsPage() {
 
     const handleExcelExport = () => {
         const dept = departments?.find(d => d.id === selectedDept)
-        exportDepartmentExcel(dept?.name || '', dept?.number || '', staff || [], assignments || [], departments || [], getStaffHourLimit)
+        exportDepartmentExcel(dept?.name || '', dept?.number || '', staff || [], assignments || [], departments || [], getStaffHourLimit, academicYear)
     }
 
     const filteredDisciplines = disciplines?.filter(d => {
