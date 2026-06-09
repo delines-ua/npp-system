@@ -25,6 +25,11 @@ dist-ssr
 
 .env
 .env.local
+.new_env
+*.env
+
+# Local scratch / data files
+tmp/
 
 # Claude Code
 .claude

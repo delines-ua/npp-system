@@ -6,6 +6,7 @@ import { EDUCATION_LEVELS } from '../utils/lawNorms'
 import type { Discipline } from '../types/database'
 import { BookOpen, Plus, Trash2, X, Save, Search, Edit2, ChevronUp } from 'lucide-react'
 import Select from '../components/Select'
+import { useSettings } from '../contexts/SettingsContext'
 
 const ACADEMIC_YEAR = '2025-2026'
 
@@ -40,6 +41,7 @@ const emptyForm = (): FormData => ({
 
 export default function DisciplinesPage() {
     const queryClient = useQueryClient()
+    const { academicYear } = useSettings()
 
     const [selectedDept, setSelectedDept] = useState('')
     const [selectedDiscId, setSelectedDiscId] = useState<string | null>(null)
@@ -60,15 +62,15 @@ export default function DisciplinesPage() {
     }, [departments])
 
     const { data: disciplines = [], isLoading } = useQuery({
-        queryKey: ['disciplines', selectedDept],
-        queryFn: () => getDisciplines(selectedDept || undefined),
+        queryKey: ['disciplines', selectedDept, academicYear],
+        queryFn: () => getDisciplines(selectedDept || undefined, academicYear),
         enabled: !!selectedDept,
     })
 
-    const invDisc = () => queryClient.invalidateQueries({ queryKey: ['disciplines', selectedDept] })
+    const invDisc = () => queryClient.invalidateQueries({ queryKey: ['disciplines'] })
 
     const createMutation = useMutation({
-        mutationFn: () => createDiscipline(addForm),
+        mutationFn: () => createDiscipline({ ...addForm, academic_year: academicYear }),
         onSuccess: () => { invDisc(); setAddForm(emptyForm()); setShowAddForm(false) },
     })
 
@@ -128,7 +130,7 @@ export default function DisciplinesPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                     <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>Дисципліни</h1>
-                    <p style={{ fontSize: '14px', color: '#6b7280' }}>Перегляд та редагування дисциплін · {ACADEMIC_YEAR}</p>
+                    <p style={{ fontSize: '14px', color: '#6b7280' }}>Перегляд та редагування дисциплін · {academicYear}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <Select

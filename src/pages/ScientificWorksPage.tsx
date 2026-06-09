@@ -5,13 +5,12 @@ import { getStaff } from '../services/staff'
 import { getScientificWorks, createScientificWork, deleteScientificWork } from '../services/scientificWorks'
 import { getDetailedAssignments } from '../services/workloadAssignments'
 import { getDisciplines } from '../services/disciplines'
-import { getStaffHourLimit, buildStaffHoursMap } from '../utils/workload'
+import { getWorkloadCeiling, buildStaffHoursMap } from '../utils/workload'
+import { useSettings } from '../contexts/SettingsContext'
 import { SCIENTIFIC_WORK_TYPES } from '../utils/lawNorms'
 import type { ScientificWorkType } from '../utils/lawNorms'
 import { GraduationCap, Plus, Trash2, AlertTriangle } from 'lucide-react'
 import Select from '../components/Select'
-
-const ACADEMIC_YEAR = '2025-2026'
 
 const card: React.CSSProperties = {
     background: '#ffffff', border: '1px solid #e5e7eb',
@@ -25,6 +24,7 @@ const selectStyle: React.CSSProperties = {
 
 export default function ScientificWorksPage() {
     const queryClient = useQueryClient()
+    const { settings, academicYear: ACADEMIC_YEAR } = useSettings()
     const [selectedDept, setSelectedDept] = useState('')
     const [addForm, setAddForm] = useState<{ staffId: string; type: ScientificWorkType; count: string; notes: string }>({
         staffId: '', type: 'bachelor_thesis', count: '', notes: '',
@@ -45,15 +45,15 @@ export default function ScientificWorksPage() {
     })
 
     const { data: disciplines = [] } = useQuery({
-        queryKey: ['disciplines', selectedDept],
-        queryFn: () => getDisciplines(selectedDept || undefined),
+        queryKey: ['disciplines', selectedDept, ACADEMIC_YEAR],
+        queryFn: () => getDisciplines(selectedDept || undefined, ACADEMIC_YEAR),
         enabled: !!selectedDept,
     })
 
     const discIds = useMemo(() => disciplines.map(d => d.id), [disciplines])
 
     const { data: detailedAssignments = [] } = useQuery({
-        queryKey: ['detailed-assignments', selectedDept],
+        queryKey: ['detailed-assignments', selectedDept, ACADEMIC_YEAR, discIds.join(',')],
         queryFn: () => getDetailedAssignments(discIds),
         enabled: !!selectedDept && discIds.length > 0,
     })
@@ -139,7 +139,7 @@ export default function ScientificWorksPage() {
                     {/* LEFT: Staff workload + their works */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                         {staff.map(s => {
-                            const limit = getStaffHourLimit(s.rate, s.is_military, s.service_years)
+                            const limit = getWorkloadCeiling(s, settings)
                             const used  = Math.round(staffHoursMap[s.id] || 0)
                             const pct   = Math.min(Math.round((used / limit) * 100), 100)
                             const isOver = used > limit

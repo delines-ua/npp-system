@@ -151,7 +151,8 @@ export const exportDepartmentExcel = (
     staff: any[],
     assignments: any[],
     departments: any[],
-    getStaffHourLimit: (rate: number, is_military: boolean, service_years: number) => number
+    getStaffHourLimit: (rate: number, is_military: boolean, service_years: number) => number,
+    academicYear: string = '2025-2026'
 ) => {
     const wb = XLSX.utils.book_new()
 
@@ -159,7 +160,7 @@ export const exportDepartmentExcel = (
     const staffHeaders = [
         ['Звіт про навантаження НПП'],
         [`Кафедра № ${deptNumber} — ${deptName}`],
-        [`Навчальний рік: 2025-2026`],
+        [`Навчальний рік: ${academicYear}`],
         [`Дата формування: ${new Date().toLocaleDateString('uk-UA')}`],
         [],
         ['ПІБ', 'Посада', 'Ставка', 'Тип', 'Вислуга (р.)', 'Ліміт (год)', 'Планове (год)', 'Фактичне (год)', 'Виконання (%)', 'Статус'],
@@ -217,7 +218,7 @@ export const exportDepartmentExcel = (
     const assignHeaders = [
         ['Розподіл навчального навантаження по дисциплінах'],
         [`Кафедра № ${deptNumber} — ${deptName}`],
-        [`Навчальний рік: 2025-2026`],
+        [`Навчальний рік: ${academicYear}`],
         [],
         ['НПП', 'Дисципліна', 'Навч. рік', 'Планове (год)', 'Фактичне (год)', 'Різниця (год)', 'Виконання (%)'],
     ]

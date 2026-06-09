@@ -91,6 +91,17 @@ export const assignThesis = async (
     }
 }
 
+export const getAssignmentsByStaffIds = async (staffIds: string[], academicYear = '2025-2026'): Promise<DetailedAssignment[]> => {
+    if (staffIds.length === 0) return []
+    const { data, error } = await supabase
+        .from('workload_assignments')
+        .select('*')
+        .in('staff_id', staffIds)
+        .eq('academic_year', academicYear)
+    if (error) throw error
+    return data || []
+}
+
 export const getAssignmentsByStaff = async (staffId: string, academicYear = '2025-2026'): Promise<DetailedAssignment[]> => {
     const { data, error } = await supabase
         .from('workload_assignments')
@@ -108,4 +119,16 @@ export const deleteDetailedAssignment = async (id: string): Promise<void> => {
         .delete()
         .eq('id', id)
     if (error) throw error
+}
+
+// HARD RESET: видаляє ВСІ розподілені години (призначення НПП) за навчальний рік.
+// Незворотна дія — використовується лише з підтвердженням «DELETE».
+export const resetWorkloadAssignments = async (academicYear: string): Promise<number> => {
+    const { data, error } = await supabase
+        .from('workload_assignments')
+        .delete()
+        .eq('academic_year', academicYear)
+        .select('id')
+    if (error) throw error
+    return data?.length ?? 0
 }

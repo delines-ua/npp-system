@@ -12,6 +12,98 @@ export const getInstituteGroups = async (): Promise<InstituteGroup[]> => {
     return data || []
 }
 
+export type InstituteGroupInput = Omit<InstituteGroup, 'id' | 'created_at'>
+
+export const createInstituteGroup = async (group: InstituteGroupInput): Promise<InstituteGroup> => {
+    const { data, error } = await supabase
+        .from('institute_groups')
+        .insert(group)
+        .select()
+        .single()
+    if (error) throw error
+    return data
+}
+
+export const updateInstituteGroup = async (id: string, group: Partial<InstituteGroupInput>): Promise<void> => {
+    const { error } = await supabase.from('institute_groups').update(group).eq('id', id)
+    if (error) throw error
+}
+
+export const deleteInstituteGroup = async (id: string): Promise<void> => {
+    const { error } = await supabase.from('institute_groups').delete().eq('id', id)
+    if (error) throw error
+}
+
+// Масовий імпорт: оновлює існуючі групи (за назвою + навч. роком), решту вставляє
+export const upsertInstituteGroups = async (
+    groups: InstituteGroupInput[]
+): Promise<{ inserted: number; updated: number }> => {
+    if (groups.length === 0) return { inserted: 0, updated: 0 }
+
+    const years = [...new Set(groups.map(g => g.academic_year))]
+    const { data: existing, error } = await supabase
+        .from('institute_groups')
+        .select('id, group_name, academic_year')
+        .in('academic_year', years)
+    if (error) throw error
+
+    const key = (name: string, year: string) => `${name.trim()}__${year}`
+    const existingMap = new Map((existing || []).map(g => [key(g.group_name, g.academic_year), g.id]))
+
+    const toInsert: InstituteGroupInput[] = []
+    let updated = 0
+    for (const g of groups) {
+        const id = existingMap.get(key(g.group_name, g.academic_year))
+        if (id) {
+            await updateInstituteGroup(id, g)
+            updated++
+        } else {
+            toInsert.push(g)
+        }
+    }
+    if (toInsert.length > 0) {
+        const { error: insErr } = await supabase.from('institute_groups').insert(toInsert)
+        if (insErr) throw insErr
+    }
+    return { inserted: toInsert.length, updated }
+}
+
+// HARD RESET: видаляє ВСІ навчальні групи за навчальний рік разом із прив'язками
+// до дисциплін (discipline_groups), щоб не лишалося «висячих» посилань.
+// Незворотна дія — використовується лише з підтвердженням «DELETE».
+export const resetInstituteGroups = async (
+    academicYear: string
+): Promise<{ groups: number; links: number }> => {
+    const { data: groups, error: gErr } = await supabase
+        .from('institute_groups')
+        .select('id')
+        .eq('academic_year', academicYear)
+    if (gErr) throw gErr
+
+    const ids = (groups || []).map(g => g.id)
+    let links = 0
+    if (ids.length > 0) {
+        // Спершу прибираємо прив'язки, які посилаються на ці групи (за будь-який рік),
+        // інакше лишаться записи discipline_groups із неіснуючим group_id.
+        const { data: delLinks, error: lErr } = await supabase
+            .from('discipline_groups')
+            .delete()
+            .in('group_id', ids)
+            .select('id')
+        if (lErr) throw lErr
+        links = delLinks?.length ?? 0
+    }
+
+    const { data: delGroups, error: dErr } = await supabase
+        .from('institute_groups')
+        .delete()
+        .eq('academic_year', academicYear)
+        .select('id')
+    if (dErr) throw dErr
+
+    return { groups: delGroups?.length ?? 0, links }
+}
+
 export const getDisciplineGroups = async (disciplineId: string): Promise<DisciplineGroupFull[]> => {
     const { data: dgData, error } = await supabase
         .from('discipline_groups')
@@ -78,11 +170,14 @@ export const updateDisciplineGroupCount = async (id: string, disciplineId: strin
 
 // Авто-зв'язок: знаходить групи по кодах спеціальностей і прив'язує до дисципліни
 // semester → course: 1-2→1, 3-4→2, 5-6→3, 7-8→4
+// isZaochna — форма навчання дисципліни: підбираємо лише групи тієї ж форми
+// (очна дисципліна → лише очні групи 241/242, заочна → лише заочні 2401).
 export const autoLinkGroupsBySpecialty = async (
     disciplineId: string,
     specialtyCodes: string,   // "122,126"
     semester = 0,
-    academicYear = '2025-2026'
+    academicYear = '2025-2026',
+    isZaochna = false
 ): Promise<number> => {
     if (!specialtyCodes.trim()) return 0
 
@@ -101,6 +196,7 @@ export const autoLinkGroupsBySpecialty = async (
         .in('specialty_code', codes)
         .eq('academic_year', academicYear)
         .eq('is_masters', isMasters)
+        .eq('zaochna', isZaochna)
     if (course > 0) query = query.eq('course', course)
     const { data: groups, error } = await query.order('group_name')
     if (error) throw error
