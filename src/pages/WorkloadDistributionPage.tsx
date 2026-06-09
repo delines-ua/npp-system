@@ -238,6 +238,14 @@ export default function WorkloadDistributionPage() {
         setSelectedDiscId(discId)
         setSelectedStaffId(null)
         setShowAddGroup(false)
+        // Викладачі вже призначені на слоти цієї дисципліни
+        const assignedStaffIds = [...new Set(
+            assignments.filter(a => a.discipline_id === discId).map(a => a.staff_id)
+        )]
+        // Якщо дисципліна ще без призначень — скидаємо вибір (не тягнемо з попередньої),
+        // інакше показуємо її поточних викладачів
+        setActiveStaffIds(assignedStaffIds)
+        setCheckedStaffIds(new Set(assignedStaffIds))
     }
 
     const handleSlotAction = (disc: Discipline, type: WorkloadTypeKey, groupNumber: number, hours: number, studentCount: number) => {
