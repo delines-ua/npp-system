@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-import { Upload, Layers, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Upload, Layers, Boxes, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
     LayoutDashboard, Building2, Users, BookOpen,
-    GraduationCap, Bot,
+    GraduationCap, Bot, Settings,
 } from 'lucide-react'
 
 const links = [
@@ -11,10 +11,12 @@ const links = [
     { to: '/departments',      label: 'Кафедри',           icon: Building2 },
     { to: '/staff',            label: 'НПП',               icon: Users },
     { to: '/disciplines',      label: 'Дисципліни',        icon: BookOpen },
+    { to: '/groups',           label: 'Навчальні групи',   icon: Boxes },
     { to: '/workload',         label: 'Розподіл',          icon: Layers },
     { to: '/scientific-works', label: 'Здобувачі',          icon: GraduationCap },
     { to: '/assistant',        label: 'AI Асистент',       icon: Bot },
     { to: '/import',           label: 'Імпорт Excel',      icon: Upload },
+    { to: '/settings',         label: 'Налаштування',      icon: Settings },
 ]
 
 const SIDEBAR_FULL = 240

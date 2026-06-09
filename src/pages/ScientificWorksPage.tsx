@@ -5,7 +5,8 @@ import { getStaff } from '../services/staff'
 import { getScientificWorks, createScientificWork, deleteScientificWork } from '../services/scientificWorks'
 import { getDetailedAssignments } from '../services/workloadAssignments'
 import { getDisciplines } from '../services/disciplines'
-import { getStaffHourLimit, buildStaffHoursMap } from '../utils/workload'
+import { getWorkloadCeiling, buildStaffHoursMap } from '../utils/workload'
+import { useSettings } from '../contexts/SettingsContext'
 import { SCIENTIFIC_WORK_TYPES } from '../utils/lawNorms'
 import type { ScientificWorkType } from '../utils/lawNorms'
 import { GraduationCap, Plus, Trash2, AlertTriangle } from 'lucide-react'
@@ -25,6 +26,7 @@ const selectStyle: React.CSSProperties = {
 
 export default function ScientificWorksPage() {
     const queryClient = useQueryClient()
+    const { settings } = useSettings()
     const [selectedDept, setSelectedDept] = useState('')
     const [addForm, setAddForm] = useState<{ staffId: string; type: ScientificWorkType; count: string; notes: string }>({
         staffId: '', type: 'bachelor_thesis', count: '', notes: '',
@@ -139,7 +141,7 @@ export default function ScientificWorksPage() {
                     {/* LEFT: Staff workload + their works */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                         {staff.map(s => {
-                            const limit = getStaffHourLimit(s.rate, s.is_military, s.service_years)
+                            const limit = getWorkloadCeiling(s, settings)
                             const used  = Math.round(staffHoursMap[s.id] || 0)
                             const pct   = Math.min(Math.round((used / limit) * 100), 100)
                             const isOver = used > limit

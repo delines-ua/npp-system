@@ -24,6 +24,20 @@ export const getScientificWorks = async (
     return data || []
 }
 
+export const getScientificWorksByStaff = async (
+    staffId: string,
+    academicYear: string
+): Promise<ScientificWork[]> => {
+    const { data, error } = await supabase
+        .from('scientific_works')
+        .select('*')
+        .eq('staff_id', staffId)
+        .eq('academic_year', academicYear)
+        .order('created_at')
+    if (error) throw error
+    return data || []
+}
+
 export const createScientificWork = async (
     staffId: string,
     departmentId: string,

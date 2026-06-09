@@ -1,4 +1,5 @@
 import type { Discipline, WorkloadTypeKey, DetailedAssignment, DisciplineGroupFull } from '../types/database'
+import type { WorkloadSettings } from './settings'
 import { TIME_NORMS, ANNUAL_HOURS } from './lawNorms'
 
 // ─── Стара бізнес-логіка (calculateWorkload) — залишається для Dashboard/звітів ──
@@ -73,18 +74,63 @@ export const calculateWorkload = (input: WorkloadInput): WorkloadResult => {
     }
 }
 
-// Ліміт годин для НПП (Таблиця 2 Наказу)
+// Ліміт службового (робочого) часу на рік для НПП — Таблиця 2 Наказу 155/291.
+// Залежить від категорії (військовий/цивільний) та вислуги років.
 export const getStaffHourLimit = (
     rate: number,
     is_military: boolean,
     service_years: number
 ): number => {
     if (!is_military) return Math.round(ANNUAL_HOURS.civilian * rate)
-    let base = ANNUAL_HOURS.military.base
+    let base: number = ANNUAL_HOURS.military.base
     if (service_years >= 20) base = ANNUAL_HOURS.military.yr20
     else if (service_years >= 15) base = ANNUAL_HOURS.military.yr15
     else if (service_years >= 10) base = ANNUAL_HOURS.military.yr10
     return Math.round(base * rate)
+}
+
+// Частка навчальної роботи у бюджеті службового часу — Таблиця 1 Наказу 155/291
+// (колонка ВВНЗ/ВНП ВНЗ), середнє значення діапазону для кожної посади.
+export const TEACHING_SHARE: Record<string, number> = {
+    'Начальник кафедри':            0.30,   // 25–35%
+    'Заступник начальника кафедри': 0.325,  // 30–35%
+    'Завідувач кафедри':            0.30,   // як начальник кафедри
+    'Професор':                     0.275,  // 25–30%
+    'Доцент':                       0.325,  // 30–35%
+    'Старший викладач':             0.40,   // 35–45%
+    'Викладач':                     0.425,  // 40–45%
+    'Асистент':                     0.475,  // 45–50%
+}
+export const DEFAULT_TEACHING_SHARE = 0.40
+
+// Ліміт навчального навантаження НПП.
+// За замовчуванням (режим 'regulatory'): частка навчальної роботи (Табл.1, за посадою)
+// × службовий час на рік (Табл.2, за категорією/вислугою) × ставка.
+// У режимі 'override' — ручний ліміт планувальника (фіксовані год/ставка за категорією).
+export const getTeachingLoadLimit = (
+    staff: { position: string; rate: number; is_military: boolean; service_years: number },
+    settings?: WorkloadSettings
+): number => {
+    if (settings?.mode === 'override') {
+        const base = staff.is_military ? settings.overrideMilitary : settings.overrideCivilian
+        return Math.round(base * staff.rate)
+    }
+    const share = TEACHING_SHARE[staff.position] ?? DEFAULT_TEACHING_SHARE
+    return Math.round(getStaffHourLimit(staff.rate, staff.is_military, staff.service_years) * share)
+}
+
+// Загальна стеля навантаження на 1 НПП (для відображення "X / ліміт" на сторінках).
+// 'override' — ручний ліміт планувальника (460/550 × ставка);
+// 'regulatory' — річний службовий час (Табл.2, напр. 1840/1720/1548 × ставка).
+export const getWorkloadCeiling = (
+    staff: { rate: number; is_military: boolean; service_years: number },
+    settings?: WorkloadSettings
+): number => {
+    if (settings?.mode === 'override') {
+        const base = staff.is_military ? settings.overrideMilitary : settings.overrideCivilian
+        return Math.round(base * staff.rate)
+    }
+    return getStaffHourLimit(staff.rate, staff.is_military, staff.service_years)
 }
 
 // ─── Нова логіка детального розподілу ───────────────────────────────────────

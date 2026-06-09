@@ -3,10 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getStaff, createStaff, updateStaff, deleteStaff } from '../services/staff'
 import { getDepartments } from '../services/departments'
 import { getDisciplines } from '../services/disciplines'
-import { getAssignmentsByStaff } from '../services/workloadAssignments'
-import { WORKLOAD_TYPE_META } from '../utils/lawNorms'
+import { getAssignmentsByStaff, getAssignmentsByStaffIds } from '../services/workloadAssignments'
+import { getScientificWorksByStaff } from '../services/scientificWorks'
+import { getTeachingLoadLimit, getWorkloadCeiling } from '../utils/workload'
+import { useSettings } from '../contexts/SettingsContext'
+import { WORKLOAD_TYPE_META, SCIENTIFIC_WORK_TYPES } from '../utils/lawNorms'
 import type { Staff } from '../types/database'
-import { Users, Plus, Trash2, X, Save, Shield, User, Edit2, BookOpen, ChevronUp } from 'lucide-react'
+import { Users, Plus, Trash2, X, Save, Shield, User, Edit2, BookOpen, ChevronUp, Gauge, Search, GraduationCap } from 'lucide-react'
 import Select from '../components/Select'
 
 const POSITIONS = [
@@ -42,7 +45,9 @@ const emptyForm = (): FormData => ({
 
 export default function StaffPage() {
     const queryClient = useQueryClient()
+    const { settings } = useSettings()
     const [selectedDept, setSelectedDept] = useState('')
+    const [search, setSearch] = useState('')
     const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
     const [isEditing, setIsEditing] = useState(false)
     const [editForm, setEditForm] = useState<FormData | null>(null)
@@ -68,10 +73,34 @@ export default function StaffPage() {
         enabled: !!selectedStaffId,
     })
 
+    const { data: staffWorks = [] } = useQuery({
+        queryKey: ['staff-scientific-works', selectedStaffId],
+        queryFn: () => getScientificWorksByStaff(selectedStaffId!, '2025-2026'),
+        enabled: !!selectedStaffId,
+    })
+
     const { data: allDisciplines = [] } = useQuery({
         queryKey: ['disciplines-all'],
         queryFn: () => getDisciplines(),
     })
+
+    const staffIds = useMemo(() => staff.map(s => s.id), [staff])
+
+    const { data: deptAssignments = [] } = useQuery({
+        queryKey: ['dept-assignments', staffIds],
+        queryFn: () => getAssignmentsByStaffIds(staffIds),
+        enabled: staffIds.length > 0,
+    })
+
+    // Фонд навчального навантаження кафедри: сума лімітів усіх НПП
+    // (частка навч. роботи за посадою × службовий час за категорією × ставка)
+    const fund = useMemo(() => {
+        const available = staff.reduce((sum, s) => sum + getTeachingLoadLimit(s, settings), 0)
+        const allocated = Math.round(deptAssignments.reduce((sum, a) => sum + a.hours, 0) * 100) / 100
+        const remaining = Math.round((available - allocated) * 100) / 100
+        const usedPct = available > 0 ? Math.min(Math.round((allocated / available) * 100), 100) : 0
+        return { available, allocated, remaining, usedPct, overloaded: allocated > available }
+    }, [staff, deptAssignments, settings])
 
     const invStaff = () => queryClient.invalidateQueries({ queryKey: ['staff', selectedDept] })
 
@@ -89,6 +118,14 @@ export default function StaffPage() {
         mutationFn: deleteStaff,
         onSuccess: () => { invStaff(); setSelectedStaffId(null); setIsEditing(false) },
     })
+
+    const filteredStaff = useMemo(() => {
+        const q = search.trim().toLowerCase()
+        if (!q) return staff
+        return staff.filter(s =>
+            s.full_name.toLowerCase().includes(q) || s.position.toLowerCase().includes(q)
+        )
+    }, [staff, search])
 
     const selectedStaff = staff.find(s => s.id === selectedStaffId) ?? null
 
@@ -113,9 +150,14 @@ export default function StaffPage() {
         return Object.values(map).sort((a, b) => a.semester - b.semester || a.name.localeCompare(b.name))
     }, [staffAssignments, allDisciplines])
 
-    const totalHours = useMemo(() => Math.round(staffAssignments.reduce((s, a) => s + a.hours, 0) * 100) / 100, [staffAssignments])
-    const isOver = totalHours > THRESHOLD
-    const pct = Math.min(Math.round((totalHours / THRESHOLD) * 100), 100)
+    // Навчальне навантаження (workload_assignments) та наукове керівництво (scientific_works)
+    const teachingHours = useMemo(() => Math.round(staffAssignments.reduce((s, a) => s + a.hours, 0) * 100) / 100, [staffAssignments])
+    const scientificHours = useMemo(() => Math.round(staffWorks.reduce((s, w) => s + w.hours, 0) * 100) / 100, [staffWorks])
+    const totalHours = Math.round((teachingHours + scientificHours) * 100) / 100
+    // Стеля навантаження: ручний ліміт (460/550) у режимі override, інакше річний службовий час (1840 і т.д.)
+    const staffLimit = selectedStaff ? getWorkloadCeiling(selectedStaff, settings) : THRESHOLD
+    const isOver = totalHours > staffLimit
+    const pct = Math.min(Math.round((totalHours / staffLimit) * 100), 100)
 
     const dept = (id: string) => departments?.find(d => d.id === id)
 
@@ -140,6 +182,21 @@ export default function StaffPage() {
                     <p style={{ fontSize: '14px', color: '#6b7280' }}>Науково-педагогічні працівники</p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative' }}>
+                        <Search size={15} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Пошук за ПІБ або посадою..."
+                            style={{ ...inputStyle, width: '240px', paddingLeft: '34px', paddingRight: search ? '30px' : '12px' }}
+                        />
+                        {search && (
+                            <button onClick={() => setSearch('')}
+                                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '2px', display: 'flex' }}>
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
                     <Select value={selectedDept} onChange={v => { setSelectedDept(v); setSelectedStaffId(null) }} options={deptOptions} style={{ minWidth: '220px' }} />
                     <button onClick={() => { setShowAddForm(v => !v); setSelectedStaffId(null) }}
                         style={{ padding: '9px 16px', background: '#f97316', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -191,6 +248,44 @@ export default function StaffPage() {
                 </div>
             )}
 
+            {/* Department workload fund summary */}
+            {!isLoading && staff.length > 0 && (
+                <div style={{ ...card, padding: '10px 16px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', whiteSpace: 'nowrap' }}>
+                        <Gauge size={15} color="#9ca3af" />
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>
+                            Фонд навантаження{selectedDept ? '' : ' (усі)'} · {staff.length} НПП
+                        </span>
+                        {settings.mode === 'override' && (
+                            <span title={`Ручний ліміт: ${settings.overrideCivilian} цив. / ${settings.overrideMilitary} військ. год на ставку`}
+                                style={{ fontSize: '10px', fontWeight: 700, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '2px 6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                                ручний режим
+                            </span>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '14px', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                        <span style={{ color: '#6b7280' }}>Фонд <b style={{ color: '#111827', fontWeight: 700 }}>{fund.available}</b></span>
+                        <span style={{ color: '#6b7280' }}>Розподілено <b style={{ color: '#3b82f6', fontWeight: 700 }}>{fund.allocated}</b></span>
+                        <span style={{ color: '#6b7280' }}>
+                            {fund.overloaded ? 'Перевищення ' : 'Залишок '}
+                            <b style={{ color: fund.overloaded ? '#dc2626' : '#22c55e', fontWeight: 700 }}>
+                                {fund.overloaded ? `+${Math.abs(fund.remaining)}` : fund.remaining}
+                            </b>
+                        </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '160px' }}>
+                        <div style={{ flex: 1, height: '6px', background: '#f3f4f6', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{
+                                height: '6px', width: `${fund.usedPct}%`,
+                                background: fund.overloaded ? '#ef4444' : '#3b82f6',
+                                borderRadius: '3px', transition: 'width 0.3s ease',
+                            }} />
+                        </div>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', whiteSpace: 'nowrap' }}>{fund.usedPct}%</span>
+                    </div>
+                </div>
+            )}
+
             {/* Two-panel layout */}
             <div style={{ display: 'grid', gridTemplateColumns: selectedStaffId ? '300px 1fr' : '1fr', gap: '16px', alignItems: 'start' }}>
 
@@ -198,13 +293,15 @@ export default function StaffPage() {
                 <div style={{ ...card, overflow: 'hidden', position: 'sticky', top: '72px' }}>
                     <div style={{ maxHeight: 'calc(100vh - 240px)', overflowY: 'auto' }}>
                         {isLoading && <div style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>Завантаження...</div>}
-                        {!isLoading && staff.length === 0 && (
+                        {!isLoading && filteredStaff.length === 0 && (
                             <div style={{ padding: '48px', textAlign: 'center' }}>
                                 <Users size={40} style={{ margin: '0 auto 12px', opacity: 0.12, color: '#9ca3af' }} />
-                                <div style={{ fontSize: '14px', color: '#9ca3af' }}>НПП не знайдено</div>
+                                <div style={{ fontSize: '14px', color: '#9ca3af' }}>
+                                    {search.trim() ? `За запитом «${search.trim()}» нічого не знайдено` : 'НПП не знайдено'}
+                                </div>
                             </div>
                         )}
-                        {staff.map(s => {
+                        {filteredStaff.map(s => {
                             const isSelected = s.id === selectedStaffId
                             const d = dept(s.department_id)
                             return (
@@ -343,7 +440,7 @@ export default function StaffPage() {
                         {/* Workload card */}
                         <div style={{ ...card, padding: '18px 20px' }}>
                             <div style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                                Навантаження 2025-2026
+                                Навантаження 2025-2026 · загальне
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                                 <div style={{ flex: 1, height: '8px', background: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>
@@ -354,15 +451,43 @@ export default function StaffPage() {
                                     }} />
                                 </div>
                                 <div style={{ fontSize: '15px', fontWeight: '700', color: isOver ? '#dc2626' : '#111827', whiteSpace: 'nowrap' }}>
-                                    {totalHours} / {THRESHOLD} год
+                                    {totalHours} / {staffLimit} год
                                     {isOver && (
                                         <span style={{ marginLeft: '8px', fontSize: '11px', background: '#fef2f2', color: '#dc2626', padding: '2px 7px', borderRadius: '4px', border: '1px solid #fecaca' }}>
-                                            +{totalHours - THRESHOLD}!
+                                            +{Math.round((totalHours - staffLimit) * 100) / 100}!
                                         </span>
                                     )}
                                 </div>
                             </div>
+                            {/* Breakdown: навчальна + наукова */}
+                            <div style={{ display: 'flex', gap: '16px', marginTop: '12px', fontSize: '12px', color: '#6b7280' }}>
+                                <span>Навчальна <b style={{ color: '#3b82f6', fontWeight: 700 }}>{teachingHours}</b> год</span>
+                                <span>Наукова <b style={{ color: '#8b5cf6', fontWeight: 700 }}>{scientificHours}</b> год</span>
+                            </div>
                         </div>
+
+                        {/* Scientific supervision card */}
+                        {staffWorks.length > 0 && (
+                            <div style={{ ...card, overflow: 'hidden' }}>
+                                <div style={{ padding: '14px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <GraduationCap size={14} color="#9ca3af" />
+                                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Наукове керівництво
+                                    </span>
+                                </div>
+                                <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {staffWorks.map(w => {
+                                        const meta = SCIENTIFIC_WORK_TYPES[w.work_type]
+                                        return (
+                                            <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
+                                                <span style={{ fontSize: '13px', fontWeight: '600', color: meta?.color ?? '#374151' }}>{meta?.label ?? w.work_type}</span>
+                                                <span style={{ fontSize: '12px', color: '#9ca3af' }}>{w.student_count} ос. × {meta?.hours}г = <b style={{ color: '#374151' }}>{w.hours}г</b></span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Disciplines card */}
                         <div style={{ ...card, overflow: 'hidden' }}>

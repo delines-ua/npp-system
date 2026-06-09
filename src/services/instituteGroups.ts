@@ -12,6 +12,62 @@ export const getInstituteGroups = async (): Promise<InstituteGroup[]> => {
     return data || []
 }
 
+export type InstituteGroupInput = Omit<InstituteGroup, 'id' | 'created_at'>
+
+export const createInstituteGroup = async (group: InstituteGroupInput): Promise<InstituteGroup> => {
+    const { data, error } = await supabase
+        .from('institute_groups')
+        .insert(group)
+        .select()
+        .single()
+    if (error) throw error
+    return data
+}
+
+export const updateInstituteGroup = async (id: string, group: Partial<InstituteGroupInput>): Promise<void> => {
+    const { error } = await supabase.from('institute_groups').update(group).eq('id', id)
+    if (error) throw error
+}
+
+export const deleteInstituteGroup = async (id: string): Promise<void> => {
+    const { error } = await supabase.from('institute_groups').delete().eq('id', id)
+    if (error) throw error
+}
+
+// Масовий імпорт: оновлює існуючі групи (за назвою + навч. роком), решту вставляє
+export const upsertInstituteGroups = async (
+    groups: InstituteGroupInput[]
+): Promise<{ inserted: number; updated: number }> => {
+    if (groups.length === 0) return { inserted: 0, updated: 0 }
+
+    const years = [...new Set(groups.map(g => g.academic_year))]
+    const { data: existing, error } = await supabase
+        .from('institute_groups')
+        .select('id, group_name, academic_year')
+        .in('academic_year', years)
+    if (error) throw error
+
+    const key = (name: string, year: string) => `${name.trim()}__${year}`
+    const existingMap = new Map((existing || []).map(g => [key(g.group_name, g.academic_year), g.id]))
+
+    const toInsert: InstituteGroupInput[] = []
+    let updated = 0
+    for (const g of groups) {
+        const id = existingMap.get(key(g.group_name, g.academic_year))
+        if (id) {
+            await updateInstituteGroup(id, g)
+            updated++
+        } else {
+            toInsert.push(g)
+        }
+    }
+    if (toInsert.length > 0) {
+        const { error: insErr } = await supabase.from('institute_groups').insert(toInsert)
+        if (insErr) throw insErr
+    }
+    return { inserted: toInsert.length, updated }
+}
+
 export const getDisciplineGroups = async (disciplineId: string): Promise<DisciplineGroupFull[]> => {
     const { data: dgData, error } = await supabase
         .from('discipline_groups')

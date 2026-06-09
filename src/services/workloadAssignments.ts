@@ -91,6 +91,17 @@ export const assignThesis = async (
     }
 }
 
+export const getAssignmentsByStaffIds = async (staffIds: string[], academicYear = '2025-2026'): Promise<DetailedAssignment[]> => {
+    if (staffIds.length === 0) return []
+    const { data, error } = await supabase
+        .from('workload_assignments')
+        .select('*')
+        .in('staff_id', staffIds)
+        .eq('academic_year', academicYear)
+    if (error) throw error
+    return data || []
+}
+
 export const getAssignmentsByStaff = async (staffId: string, academicYear = '2025-2026'): Promise<DetailedAssignment[]> => {
     const { data, error } = await supabase
         .from('workload_assignments')
