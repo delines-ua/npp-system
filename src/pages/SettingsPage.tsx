@@ -1,7 +1,11 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSettings } from '../contexts/SettingsContext'
 import { DEFAULT_WORKLOAD_SETTINGS, type WorkloadSettings } from '../utils/settings'
-import { Settings as SettingsIcon, Save, RotateCcw, Check, ShieldAlert } from 'lucide-react'
+import { resetWorkloadAssignments } from '../services/workloadAssignments'
+import { resetInstituteGroups } from '../services/instituteGroups'
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
+import { Settings as SettingsIcon, Save, RotateCcw, Check, ShieldAlert, Trash2, Layers, ClipboardList } from 'lucide-react'
 
 const card: React.CSSProperties = {
     background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '16px',
@@ -13,12 +17,40 @@ const inputStyle: React.CSSProperties = {
 }
 const lbl: React.CSSProperties = { display: 'block', fontSize: '12px', color: '#6b7280', marginBottom: '6px', fontWeight: '500' }
 
+type ResetTarget = 'workload' | 'groups'
+
 export default function SettingsPage() {
-    const { settings, updateSettings } = useSettings()
+    const { settings, updateSettings, academicYear } = useSettings()
+    const queryClient = useQueryClient()
     const [draft, setDraft] = useState<WorkloadSettings>(settings)
     const [saved, setSaved] = useState(false)
 
+    const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null)
+    const [resetting, setResetting] = useState(false)
+    const [resetMsg, setResetMsg] = useState('')
+
     const dirty = JSON.stringify(draft) !== JSON.stringify(settings)
+
+    const runReset = async () => {
+        if (!resetTarget) return
+        setResetting(true)
+        setResetMsg('')
+        try {
+            if (resetTarget === 'workload') {
+                const n = await resetWorkloadAssignments(academicYear)
+                await queryClient.invalidateQueries()
+                setResetMsg(`Видалено розподілених годин (призначень): ${n} · ${academicYear}`)
+            } else {
+                const { groups, links } = await resetInstituteGroups(academicYear)
+                await queryClient.invalidateQueries()
+                setResetMsg(`Видалено груп: ${groups}, прив'язок до дисциплін: ${links} · ${academicYear}`)
+            }
+            setResetTarget(null)
+        } catch {
+            setResetMsg('Помилка під час видалення. Спробуйте ще раз.')
+        }
+        setResetting(false)
+    }
 
     const save = () => {
         updateSettings({
@@ -119,9 +151,80 @@ export default function SettingsPage() {
                 </div>
             </div>
 
-            <p style={{ fontSize: '12px', color: '#9ca3af' }}>
+            <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '28px' }}>
                 Налаштування зберігаються локально у браузері та застосовуються до фонду навантаження кафедри.
             </p>
+
+            {/* ── Небезпечна зона ─────────────────────────────────────────── */}
+            <div style={{ ...card, padding: '24px', border: '1px solid #fecaca', boxShadow: 'none' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#b91c1c', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ShieldAlert size={17} /> Небезпечна зона
+                </h3>
+                <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '18px' }}>
+                    Незворотні дії для навчального року <b style={{ color: '#dc2626' }}>{academicYear}</b>.
+                    Кожна потребує ручного підтвердження введенням слова «DELETE».
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <DangerRow
+                        icon={<ClipboardList size={16} color="#dc2626" />}
+                        title="Скинути розподілене навантаження"
+                        desc={`Видаляє всі призначення НПП (розподілені години) за ${academicYear}. Самі дисципліни та групи лишаються.`}
+                        onClick={() => { setResetMsg(''); setResetTarget('workload') }}
+                    />
+                    <DangerRow
+                        icon={<Layers size={16} color="#dc2626" />}
+                        title="Скинути навчальні групи"
+                        desc={`Видаляє всі групи за ${academicYear} та їх прив'язки до дисциплін. Потрібно перед повторним імпортом «Додаток 2».`}
+                        onClick={() => { setResetMsg(''); setResetTarget('groups') }}
+                    />
+                </div>
+
+                {resetMsg && (
+                    <div style={{ marginTop: '16px', padding: '10px 14px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '13px' }}>
+                        ✓ {resetMsg}
+                    </div>
+                )}
+            </div>
+
+            <ConfirmDeleteModal
+                open={resetTarget === 'workload'}
+                title="Скинути розподілене навантаження?"
+                message={<>Буде <b>назавжди видалено всі розподілені години</b> (призначення НПП) за навчальний рік <b>{academicYear}</b>. Дисципліни та групи не зачіпаються. Відновити дані буде неможливо.</>}
+                confirmLabel="Видалити навантаження"
+                busy={resetting}
+                onConfirm={runReset}
+                onClose={() => setResetTarget(null)}
+            />
+            <ConfirmDeleteModal
+                open={resetTarget === 'groups'}
+                title="Скинути навчальні групи?"
+                message={<>Буде <b>назавжди видалено всі навчальні групи</b> за навчальний рік <b>{academicYear}</b> разом із їх прив'язками до дисциплін. Після цього імпортуйте «Додаток 2» заново. Відновити дані буде неможливо.</>}
+                confirmLabel="Видалити групи"
+                busy={resetting}
+                onConfirm={runReset}
+                onClose={() => setResetTarget(null)}
+            />
+        </div>
+    )
+}
+
+// ── Рядок небезпечної дії ─────────────────────────────────────────────────────
+function DangerRow({ icon, title, desc, onClick }: {
+    icon: React.ReactNode; title: string; desc: string; onClick: () => void
+}) {
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', background: '#fff7f7', border: '1px solid #fee2e2', borderRadius: '12px' }}>
+            <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '3px' }}>
+                    {icon} {title}
+                </div>
+                <div style={{ fontSize: '12px', color: '#6b7280', lineHeight: 1.5 }}>{desc}</div>
+            </div>
+            <button onClick={onClick}
+                style={{ flexShrink: 0, padding: '8px 14px', background: '#fff', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Trash2 size={14} /> Скинути
+            </button>
         </div>
     )
 }

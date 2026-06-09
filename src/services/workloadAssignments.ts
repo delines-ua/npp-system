@@ -120,3 +120,15 @@ export const deleteDetailedAssignment = async (id: string): Promise<void> => {
         .eq('id', id)
     if (error) throw error
 }
+
+// HARD RESET: видаляє ВСІ розподілені години (призначення НПП) за навчальний рік.
+// Незворотна дія — використовується лише з підтвердженням «DELETE».
+export const resetWorkloadAssignments = async (academicYear: string): Promise<number> => {
+    const { data, error } = await supabase
+        .from('workload_assignments')
+        .delete()
+        .eq('academic_year', academicYear)
+        .select('id')
+    if (error) throw error
+    return data?.length ?? 0
+}

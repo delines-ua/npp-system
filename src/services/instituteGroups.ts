@@ -68,6 +68,42 @@ export const upsertInstituteGroups = async (
     return { inserted: toInsert.length, updated }
 }
 
+// HARD RESET: видаляє ВСІ навчальні групи за навчальний рік разом із прив'язками
+// до дисциплін (discipline_groups), щоб не лишалося «висячих» посилань.
+// Незворотна дія — використовується лише з підтвердженням «DELETE».
+export const resetInstituteGroups = async (
+    academicYear: string
+): Promise<{ groups: number; links: number }> => {
+    const { data: groups, error: gErr } = await supabase
+        .from('institute_groups')
+        .select('id')
+        .eq('academic_year', academicYear)
+    if (gErr) throw gErr
+
+    const ids = (groups || []).map(g => g.id)
+    let links = 0
+    if (ids.length > 0) {
+        // Спершу прибираємо прив'язки, які посилаються на ці групи (за будь-який рік),
+        // інакше лишаться записи discipline_groups із неіснуючим group_id.
+        const { data: delLinks, error: lErr } = await supabase
+            .from('discipline_groups')
+            .delete()
+            .in('group_id', ids)
+            .select('id')
+        if (lErr) throw lErr
+        links = delLinks?.length ?? 0
+    }
+
+    const { data: delGroups, error: dErr } = await supabase
+        .from('institute_groups')
+        .delete()
+        .eq('academic_year', academicYear)
+        .select('id')
+    if (dErr) throw dErr
+
+    return { groups: delGroups?.length ?? 0, links }
+}
+
 export const getDisciplineGroups = async (disciplineId: string): Promise<DisciplineGroupFull[]> => {
     const { data: dgData, error } = await supabase
         .from('discipline_groups')
