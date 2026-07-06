@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getDepartments, createDepartment, deleteDepartment } from '../services/departments'
-import { Building2, Plus, Trash2, X, Save } from 'lucide-react'
+import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from '../services/departments'
+import { Building2, Plus, Trash2, X, Save, Pencil } from 'lucide-react'
 
 const card = {
     background: '#ffffff',
@@ -33,6 +33,16 @@ export default function DepartmentsPage() {
     const [name, setName] = useState('')
     const [number, setNumber] = useState('')
     const [showForm, setShowForm] = useState(false)
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editName, setEditName] = useState('')
+    const [editNumber, setEditNumber] = useState('')
+
+    const startEdit = (id: string, currentNumber: string, currentName: string) => {
+        setEditingId(id)
+        setEditNumber(currentNumber)
+        setEditName(currentName)
+    }
+    const cancelEdit = () => setEditingId(null)
 
     const { data: departments, isLoading } = useQuery({
         queryKey: ['departments'],
@@ -46,6 +56,15 @@ export default function DepartmentsPage() {
             setName('')
             setNumber('')
             setShowForm(false)
+        },
+    })
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, name, number }: { id: string; name: string; number: string }) =>
+            updateDepartment(id, name, number),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['departments'] })
+            setEditingId(null)
         },
     })
 
@@ -138,32 +157,93 @@ export default function DepartmentsPage() {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
+                        gap: '16px',
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <div style={{
-                                width: '42px', height: '42px',
-                                background: '#fff7ed',
-                                border: '1px solid #fed7aa',
-                                borderRadius: '10px',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                                <Building2 size={20} color="#f97316" />
-                            </div>
-                            <div>
-                                <div style={{ fontWeight: '600', fontSize: '15px', color: '#111827' }}>
-                                    Кафедра № {dept.number}
+                        {editingId === dept.id ? (
+                            <>
+                                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', flex: 1 }}>
+                                    <div style={{ width: '120px' }}>
+                                        <label style={labelStyle}>Номер</label>
+                                        <input
+                                            style={input}
+                                            value={editNumber}
+                                            onChange={e => setEditNumber(e.target.value)}
+                                            placeholder="11"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={labelStyle}>Назва кафедри</label>
+                                        <input
+                                            style={input}
+                                            value={editName}
+                                            onChange={e => setEditName(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && editName && editNumber) {
+                                                    updateMutation.mutate({ id: dept.id, name: editName.trim(), number: editNumber.trim() })
+                                                }
+                                                if (e.key === 'Escape') cancelEdit()
+                                            }}
+                                            placeholder="Назва кафедри"
+                                        />
+                                    </div>
                                 </div>
-                                <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
-                                    {dept.name}
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        onClick={() => updateMutation.mutate({ id: dept.id, name: editName.trim(), number: editNumber.trim() })}
+                                        disabled={!editName || !editNumber || updateMutation.isPending}
+                                        style={{ padding: '10px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                    >
+                                        <Save size={16} />
+                                        {updateMutation.isPending ? 'Збереження...' : 'Зберегти'}
+                                    </button>
+                                    <button
+                                        onClick={cancelEdit}
+                                        style={{ padding: '10px 12px', background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                    >
+                                        <X size={16} />
+                                    </button>
                                 </div>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => deleteMutation.mutate(dept.id)}
-                            style={{ padding: '8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#dc2626', display: 'flex', alignItems: 'center' }}
-                        >
-                            <Trash2 size={16} />
-                        </button>
+                            </>
+                        ) : (
+                            <>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                    <div style={{
+                                        width: '42px', height: '42px',
+                                        background: '#fff7ed',
+                                        border: '1px solid #fed7aa',
+                                        borderRadius: '10px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    }}>
+                                        <Building2 size={20} color="#f97316" />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: '600', fontSize: '15px', color: '#111827' }}>
+                                            Кафедра № {dept.number}
+                                        </div>
+                                        <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
+                                            {dept.name}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        onClick={() => startEdit(dept.id, dept.number, dept.name)}
+                                        title="Редагувати"
+                                        style={{ padding: '8px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer', color: '#2563eb', display: 'flex', alignItems: 'center' }}
+                                    >
+                                        <Pencil size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => deleteMutation.mutate(dept.id)}
+                                        title="Видалити"
+                                        style={{ padding: '8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', color: '#dc2626', display: 'flex', alignItems: 'center' }}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 ))}
             </div>

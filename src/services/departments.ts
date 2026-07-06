@@ -25,6 +25,22 @@ export const createDepartment = async (
     return data
 }
 
+export const updateDepartment = async (
+    id: string,
+    name: string,
+    number: string
+): Promise<Department> => {
+    const { data, error } = await supabase
+        .from('departments')
+        .update({ name, number })
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) throw error
+    return data
+}
+
 export const deleteDepartment = async (id: string): Promise<void> => {
     const { error } = await supabase
         .from('departments')
