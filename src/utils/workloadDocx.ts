@@ -298,10 +298,8 @@ export const buildWorkloadDoc = (
 
     // ── Шапка ──
     const headerParts: Paragraph[] = [
-        centered([txt('ВІЙСЬКОВИЙ ІНСТИТУТ ТЕЛЕКОМУНІКАЦІЙ ТА ІНФОРМАТИЗАЦІЇ', { bold: true, size: 24 })]),
-        centered([txt('імені Героїв Крут', { bold: true, size: 24 })], { spacingAfter: 200 }),
         centered([txt('ЗВІТ ПРО РОЗПОДІЛ НАВЧАЛЬНОГО НАВАНТАЖЕННЯ НПП', { bold: true, size: 28 })], { spacingAfter: 120 }),
-        centered([txt(`Кафедра № ${deptNumber} — ${deptName}`, { size: 24 })]),
+        centered([txt(`${deptName}`, { size: 24 })]),
         centered([txt(`Навчальний рік: ${academicYear}    ·    Сформовано: ${dateStr}`, { size: 22 })], { spacingAfter: 240 }),
     ]
 
