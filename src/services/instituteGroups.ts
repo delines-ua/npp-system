@@ -123,6 +123,31 @@ export const getDisciplineGroups = async (disciplineId: string): Promise<Discipl
     return dgData.map(dg => ({ ...dg, group: groupMap[dg.group_id] })) as DisciplineGroupFull[]
 }
 
+// Масовий варіант getDisciplineGroups — прив'язки груп одразу для багатьох
+// дисциплін (для звіту по кафедрі). Один запит замість N.
+export const getDisciplineGroupsForDisciplines = async (
+    disciplineIds: string[]
+): Promise<DisciplineGroupFull[]> => {
+    if (disciplineIds.length === 0) return []
+
+    const { data: dgData, error } = await supabase
+        .from('discipline_groups')
+        .select('*')
+        .in('discipline_id', disciplineIds)
+        .order('group_order')
+    if (error) throw error
+    if (!dgData || dgData.length === 0) return []
+
+    const groupIds = [...new Set(dgData.map(dg => dg.group_id))]
+    const { data: groups } = await supabase
+        .from('institute_groups')
+        .select('*')
+        .in('id', groupIds)
+
+    const groupMap = Object.fromEntries((groups || []).map(g => [g.id, g]))
+    return dgData.map(dg => ({ ...dg, group: groupMap[dg.group_id] })) as DisciplineGroupFull[]
+}
+
 // Перераховує disciplines.student_count = сума всіх прив'язаних груп
 const syncDisciplineStudentCount = async (disciplineId: string): Promise<void> => {
     const { data } = await supabase

@@ -12,6 +12,7 @@ import {
 import {
     getInstituteGroups,
     getDisciplineGroups,
+    getDisciplineGroupsForDisciplines,
     addDisciplineGroup,
     removeDisciplineGroup,
     autoLinkGroupsBySpecialty,
@@ -20,8 +21,9 @@ import {
     getApplicableSlots,
     getDisciplineStatus,
 } from '../utils/workload'
-import type { Discipline, Staff, WorkloadTypeKey } from '../types/database'
-import { Layers, Search, UserCheck, Users, Plus, X, ChevronDown, ExternalLink } from 'lucide-react'
+import { buildWorkloadReportModel, exportWorkloadDocx } from '../utils/workloadDocx'
+import type { Discipline, Staff, WorkloadTypeKey, DisciplineGroupFull } from '../types/database'
+import { Layers, Search, UserCheck, Users, Plus, X, ChevronDown, ExternalLink, FileDown } from 'lucide-react'
 import Select from '../components/Select'
 import { useSettings } from '../contexts/SettingsContext'
 
@@ -45,7 +47,8 @@ const WORKLOAD_TYPE_COLOR: Record<string, string> = {
 
 export default function WorkloadDistributionPage() {
     const queryClient = useQueryClient()
-    const { academicYear: ACADEMIC_YEAR } = useSettings()
+    const { academicYear: ACADEMIC_YEAR, settings } = useSettings()
+    const [exporting, setExporting] = useState(false)
     const [selectedDept, setSelectedDept] = useState('')
     const [selectedDiscId, setSelectedDiscId] = useState<string | null>(null)
     const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
@@ -271,6 +274,38 @@ export default function WorkloadDistributionPage() {
     // Слоти для обраної дисципліни
     const slots = selectedDisc ? getApplicableSlots(selectedDisc, disciplineGroups.length > 0 ? disciplineGroups : undefined) : []
 
+    // ── Експорт звіту (.docx) ───────────────────────────────────────────────────
+    const handleExportReport = async () => {
+        if (!selectedDept || assignments.length === 0 || exporting) return
+        const dept = departments?.find(d => d.id === selectedDept)
+        if (!dept) return
+        setExporting(true)
+        try {
+            // Прив'язки груп одразу для всіх дисциплін кафедри (реальні назви груп у звіті)
+            const allDiscGroups = await queryClient.fetchQuery({
+                queryKey: ['discipline-groups-bulk', selectedDept, ACADEMIC_YEAR, discIds.join(',')],
+                queryFn: () => getDisciplineGroupsForDisciplines(discIds),
+            })
+            const discGroupsByDisc = new Map<string, DisciplineGroupFull[]>()
+            for (const dg of allDiscGroups) {
+                const arr = discGroupsByDisc.get(dg.discipline_id) ?? []
+                arr.push(dg)
+                discGroupsByDisc.set(dg.discipline_id, arr)
+            }
+            const model = buildWorkloadReportModel(staff, disciplines, assignments, discGroupsByDisc, settings)
+            if (model.length === 0) {
+                alert('Немає розподіленого навантаження для формування звіту.')
+                return
+            }
+            exportWorkloadDocx(model, dept.number, dept.name, ACADEMIC_YEAR)
+        } catch (e) {
+            console.error('Export report failed', e)
+            alert('Не вдалося сформувати звіт. Деталі у консолі.')
+        } finally {
+            setExporting(false)
+        }
+    }
+
     // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div>
@@ -284,15 +319,38 @@ export default function WorkloadDistributionPage() {
                         Призначення викладачів по типах занять та групах · {ACADEMIC_YEAR}
                     </p>
                 </div>
-                <Select
-                    value={selectedDept}
-                    onChange={handleDeptChange}
-                    placeholder="Оберіть кафедру"
-                    style={{ minWidth: '280px' }}
-                    options={[
-                        ...(departments?.map(d => ({ value: d.id, label: `Кафедра № ${d.number} — ${d.name}` })) ?? []),
-                    ]}
-                />
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    {selectedDept && (
+                        <button
+                            onClick={handleExportReport}
+                            disabled={assignments.length === 0 || exporting}
+                            title={assignments.length === 0 ? 'Немає розподіленого навантаження' : 'Завантажити звіт (.docx)'}
+                            style={{
+                                padding: '10px 16px',
+                                background: assignments.length === 0 ? '#f9fafb' : '#eff6ff',
+                                border: `1px solid ${assignments.length === 0 ? '#e5e7eb' : '#bfdbfe'}`,
+                                borderRadius: '8px',
+                                cursor: assignments.length === 0 || exporting ? 'not-allowed' : 'pointer',
+                                fontSize: '14px', fontWeight: '500',
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                color: assignments.length === 0 ? '#9ca3af' : '#2563eb',
+                                whiteSpace: 'nowrap',
+                                opacity: exporting ? 0.7 : 1,
+                            }}
+                        >
+                            <FileDown size={16} /> {exporting ? 'Формування…' : 'Завантажити звіт'}
+                        </button>
+                    )}
+                    <Select
+                        value={selectedDept}
+                        onChange={handleDeptChange}
+                        placeholder="Оберіть кафедру"
+                        style={{ minWidth: '280px' }}
+                        options={[
+                            ...(departments?.map(d => ({ value: d.id, label: `Кафедра № ${d.number} — ${d.name}` })) ?? []),
+                        ]}
+                    />
+                </div>
             </div>
 
             {!selectedDept && (
@@ -703,6 +761,7 @@ export default function WorkloadDistributionPage() {
                                 {staffPickerOpen && (
                                     <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fafafa' }}>
                                         <input
+                                            autoFocus
                                             value={staffSearch}
                                             onChange={e => setStaffSearch(e.target.value)}
                                             placeholder="Пошук за прізвищем..."
