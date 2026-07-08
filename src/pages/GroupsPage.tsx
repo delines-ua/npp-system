@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import {
     getInstituteGroups, createInstituteGroup, updateInstituteGroup,
-    deleteInstituteGroup, upsertInstituteGroups,
+    deleteInstituteGroup, upsertInstituteGroups, propagateGroupStudentCount,
     type InstituteGroupInput,
 } from '../services/instituteGroups'
 import { parseGroupsSheet, detectAcademicYear, type ParsedGroup } from '../utils/parseGroupsXlsx'
@@ -56,8 +56,57 @@ export default function GroupsPage() {
         onSuccess: () => { inv(); setAddForm(emptyForm()); setShowAddForm(false) },
     })
     const updateMut = useMutation({
-        mutationFn: () => updateInstituteGroup(editingId!, editForm!),
-        onSuccess: () => { inv(); setEditingId(null); setEditForm(null) },
+        mutationFn: async () => {
+            const prev = groups.find(g => g.id === editingId)
+            const newCount = editForm!.student_count
+            const willCascade = !!prev && prev.student_count !== newCount
+
+            // Захист від некоректного значення (порожнє поле → Number('') === 0, NaN).
+            if (!Number.isFinite(newCount) || newCount < 0) {
+                alert('Некоректна кількість курсантів.')
+                return { cancelled: true } as const
+            }
+            // Обнулення курсантів каскадно обнулить години у прив'язаних дисциплінах —
+            // підтверджуємо, щоб випадкове очищення поля не «стерло» навантаження.
+            if (willCascade && newCount === 0 && prev.student_count > 0) {
+                const ok = confirm(
+                    'Кількість курсантів = 0 обнулить навантаження (курсові/іспити/заліки) ' +
+                    'у всіх прив\'язаних дисциплінах. Продовжити?'
+                )
+                if (!ok) return { cancelled: true } as const
+            }
+
+            await updateInstituteGroup(editingId!, editForm!)
+            // Зміна кількості курсантів → каскадний перерахунок навантаження
+            // прив'язаних дисциплін (курсові/контрольні/іспити/заліки).
+            if (willCascade) {
+                return propagateGroupStudentCount(editingId!, newCount, prev.student_count)
+            }
+            return null
+        },
+        onSuccess: (res) => {
+            if (res && 'cancelled' in res) { setEditingId(null); setEditForm(null); return }
+            inv()
+            if (res && res.disciplines > 0) {
+                // Навантаження змінилось — оновлюємо кеш сторінки розподілу.
+                queryClient.invalidateQueries({ queryKey: ['disciplines'] })
+                queryClient.invalidateQueries({ queryKey: ['discipline-groups'] })
+                queryClient.invalidateQueries({ queryKey: ['detailed-assignments'] })
+                if (res.assignmentsUpdated > 0) {
+                    alert(`Перераховано навантаження: ${res.assignmentsUpdated} призначень у ${res.disciplines} дисциплінах.`)
+                }
+            }
+            setEditingId(null); setEditForm(null)
+        },
+        onError: () => {
+            // Каскад не транзакційний: якщо збій стався в середині, частину рядків
+            // могло бути оновлено. Повідомляємо і оновлюємо кеш, щоб показати факт.
+            inv()
+            queryClient.invalidateQueries({ queryKey: ['disciplines'] })
+            queryClient.invalidateQueries({ queryKey: ['discipline-groups'] })
+            queryClient.invalidateQueries({ queryKey: ['detailed-assignments'] })
+            alert('Не вдалося повністю зберегти зміни. Частину навантаження могло бути перераховано — перевірте розподіл.')
+        },
     })
     const deleteMut = useMutation({ mutationFn: deleteInstituteGroup, onSuccess: inv })
 

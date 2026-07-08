@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
-import type { InstituteGroup, DisciplineGroupFull } from '../types/database'
+import type { InstituteGroup, DisciplineGroupFull, Discipline } from '../types/database'
+import { getApplicableSlots } from '../utils/workload'
 
 export const getInstituteGroups = async (): Promise<InstituteGroup[]> => {
     const { data, error } = await supabase
@@ -30,8 +31,33 @@ export const updateInstituteGroup = async (id: string, group: Partial<InstituteG
 }
 
 export const deleteInstituteGroup = async (id: string): Promise<void> => {
+    // institute_groups не має FK ON DELETE CASCADE на discipline_groups, тож
+    // спершу прибираємо прив'язки цієї групи — інакше лишається «висяче»
+    // посилання (dg.group == null), яке зсуває нумерацію груп у getApplicableSlots
+    // і псує зіставлення слотів із призначеннями під час перерахунку.
+    const { data: links } = await supabase
+        .from('discipline_groups')
+        .select('discipline_id')
+        .eq('group_id', id)
+    const disciplineIds = [...new Set((links || []).map(l => l.discipline_id))]
+
+    if (disciplineIds.length > 0) {
+        const { error: delLinksErr } = await supabase
+            .from('discipline_groups')
+            .delete()
+            .eq('group_id', id)
+        if (delLinksErr) throw delLinksErr
+    }
+
     const { error } = await supabase.from('institute_groups').delete().eq('id', id)
     if (error) throw error
+
+    // Група зникла зі складу дисциплін → пересинхронізуємо к-сть курсантів і
+    // перераховуємо навантаження задіяних дисциплін.
+    for (const discId of disciplineIds) {
+        await syncDisciplineStudentCount(discId)
+        await recalcDisciplineAssignmentHours(discId)
+    }
 }
 
 // Масовий імпорт: оновлює існуючі групи (за назвою + навч. роком), решту вставляє
@@ -191,6 +217,91 @@ export const updateDisciplineGroupCount = async (id: string, disciplineId: strin
         .eq('id', id)
     if (error) throw error
     await syncDisciplineStudentCount(disciplineId)
+    await recalcDisciplineAssignmentHours(disciplineId)
+}
+
+// Перераховує години у workload_assignments дисципліни під поточну кількість
+// курсантів у групах. Години типів, що залежать від курсантів (курсові,
+// контрольні, іспити, заліки), генеруються getApplicableSlots і зіставляються з
+// наявними призначеннями за (тип + номер групи). Викладач у слоті зберігається —
+// оновлюються лише hours/student_count. Повертає к-сть змінених записів.
+export const recalcDisciplineAssignmentHours = async (disciplineId: string): Promise<number> => {
+    const { data: disc, error: discErr } = await supabase
+        .from('disciplines')
+        .select('*')
+        .eq('id', disciplineId)
+        .single()
+    if (discErr || !disc) return 0
+
+    const discGroups = await getDisciplineGroups(disciplineId)
+    const slots = getApplicableSlots(disc as Discipline, discGroups.length > 0 ? discGroups : undefined)
+    const slotMap = new Map(slots.map(s => [`${s.type}|${s.groupNumber}`, s]))
+
+    const { data: assigns, error: aErr } = await supabase
+        .from('workload_assignments')
+        .select('*')
+        .eq('discipline_id', disciplineId)
+    if (aErr || !assigns) return 0
+
+    // Рахуємо лише слоти, де змінились ГОДИНИ (курсові/контрольні/іспити/заліки) —
+    // саме це впливає на навантаження. Поле student_count синхронізуємо завжди,
+    // але метадані-без-зміни-годин (лекції/ГЗ/ПЗ) у лічильник не потрапляють.
+    let updated = 0
+    const updates: Promise<void>[] = []
+    for (const a of assigns) {
+        const slot = slotMap.get(`${a.workload_type}|${a.group_number}`)
+        if (!slot) continue   // напр. атестаційні роботи — окремий планувальник
+        const hoursChanged = slot.hours !== a.hours
+        if (hoursChanged || slot.studentCount !== a.student_count) {
+            updates.push(
+                supabase
+                    .from('workload_assignments')
+                    .update({ hours: slot.hours, student_count: slot.studentCount })
+                    .eq('id', a.id)
+                    .then(({ error }) => { if (error) throw error })
+            )
+            if (hoursChanged) updated++
+        }
+    }
+    await Promise.all(updates)   // незалежні оновлення рядків — виконуємо паралельно
+    return updated
+}
+
+// Каскад при зміні кількості курсантів у групі institute_groups:
+// 1) оновлює student_count у всіх прив'язках цієї групи (discipline_groups),
+// 2) пересинхронізує disciplines.student_count задіяних дисциплін,
+// 3) перераховує години у workload_assignments цих дисциплін.
+export const propagateGroupStudentCount = async (
+    groupId: string,
+    newStudentCount: number,
+    prevCount?: number,   // якщо задано — оновлюємо лише прив'язки, що досі
+                          // тримали стару к-сть групи (зберігає ручні override)
+): Promise<{ disciplines: number; assignmentsUpdated: number }> => {
+    const { data: links, error } = await supabase
+        .from('discipline_groups')
+        .select('discipline_id')
+        .eq('group_id', groupId)
+    if (error) throw error
+    if (!links || links.length === 0) return { disciplines: 0, assignmentsUpdated: 0 }
+
+    // Оновлюємо student_count у прив'язках. Якщо передано prevCount — чіпаємо лише
+    // ті, що досі дорівнювали старому розміру групи, не затираючи ручні правки
+    // окремих дисциплін (updateDisciplineGroupCount).
+    let upQuery = supabase
+        .from('discipline_groups')
+        .update({ student_count: newStudentCount })
+        .eq('group_id', groupId)
+    if (prevCount !== undefined) upQuery = upQuery.eq('student_count', prevCount)
+    const { error: upErr } = await upQuery
+    if (upErr) throw upErr
+
+    const disciplineIds = [...new Set(links.map(l => l.discipline_id))]
+    let assignmentsUpdated = 0
+    for (const discId of disciplineIds) {
+        await syncDisciplineStudentCount(discId)
+        assignmentsUpdated += await recalcDisciplineAssignmentHours(discId)
+    }
+    return { disciplines: disciplineIds.length, assignmentsUpdated }
 }
 
 // Авто-зв'язок: знаходить групи по кодах спеціальностей і прив'язує до дисципліни
