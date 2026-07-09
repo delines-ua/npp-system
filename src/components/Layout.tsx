@@ -24,7 +24,7 @@ const links = [
 
 const SIDEBAR_FULL = 240
 const SIDEBAR_MINI = 64
-const APP_VERSION = '1.01'
+const APP_VERSION = '1.02'
 
 export default function Layout() {
     const [collapsed, setCollapsed] = useState(false)

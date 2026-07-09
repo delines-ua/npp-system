@@ -9,6 +9,7 @@ import { EDUCATION_LEVELS, WORKLOAD_TYPE_META } from '../utils/lawNorms'
 import type { Discipline, WorkloadTypeKey, DetailedAssignment, Staff } from '../types/database'
 import { BookOpen, Plus, Trash2, X, Save, Search, Edit2, ChevronUp, Users, GraduationCap, ArrowLeft } from 'lucide-react'
 import Select from '../components/Select'
+import NumberInput from '../components/NumberInput'
 import { useSettings } from '../contexts/SettingsContext'
 
 const ACADEMIC_YEAR = '2025-2026'
@@ -175,9 +176,9 @@ export default function DisciplinesPage() {
     ) => (
         <div key={field}>
             <label style={labelStyle}>{label}</label>
-            <input style={inputStyle} type="number" min={0}
+            <NumberInput style={inputStyle} min={0}
                 value={form[field] as number}
-                onChange={e => setter({ ...form, [field]: Number(e.target.value) })}
+                onChange={v => setter({ ...form, [field]: v })}
             />
         </div>
     )
@@ -484,7 +485,7 @@ export default function DisciplinesPage() {
                             <div>
                                 <label style={labelStyle}>Семестр</label>
                                 {isEditing ? (
-                                    <input style={inputStyle} type="number" min={1} max={10} value={editForm!.semester} onChange={e => setEditForm({ ...editForm!, semester: Number(e.target.value) })} />
+                                    <NumberInput style={inputStyle} min={1} max={10} value={editForm!.semester} onChange={v => setEditForm({ ...editForm!, semester: v })} />
                                 ) : (
                                     <div style={{ padding: '8px 11px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px', color: '#374151', border: '1px solid #e5e7eb' }}>{displayForm.semester}</div>
                                 )}
@@ -512,9 +513,9 @@ export default function DisciplinesPage() {
                                     <div key={field}>
                                         <label style={labelStyle}>{label}</label>
                                         {isEditing ? (
-                                            <input style={inputStyle} type="number" min={0}
+                                            <NumberInput style={inputStyle} min={0}
                                                 value={editForm![field] as number}
-                                                onChange={e => setEditForm({ ...editForm!, [field]: Number(e.target.value) })} />
+                                                onChange={v => setEditForm({ ...editForm!, [field]: v })} />
                                         ) : (
                                             <div style={{ padding: '8px 11px', background: (displayForm[field] as number) > 0 ? '#eff6ff' : '#f9fafb', borderRadius: '8px', fontSize: '13px', fontWeight: (displayForm[field] as number) > 0 ? '600' : '400', color: (displayForm[field] as number) > 0 ? '#1d4ed8' : '#9ca3af', border: '1px solid #e5e7eb' }}>
                                                 {displayForm[field] as number}
@@ -527,7 +528,7 @@ export default function DisciplinesPage() {
                                 <div>
                                     <label style={labelStyle}>Всього годин</label>
                                     {isEditing ? (
-                                        <input style={{ ...inputStyle, fontWeight: '700' }} type="number" min={0} value={editForm!.total_hours} onChange={e => setEditForm({ ...editForm!, total_hours: Number(e.target.value) })} />
+                                        <NumberInput style={{ ...inputStyle, fontWeight: '700' }} min={0} value={editForm!.total_hours} onChange={v => setEditForm({ ...editForm!, total_hours: v })} />
                                     ) : (
                                         <div style={{ padding: '8px 11px', background: '#f0fdf4', borderRadius: '8px', fontSize: '14px', fontWeight: '700', color: '#15803d', border: '1px solid #bbf7d0' }}>
                                             {displayForm.total_hours} год
@@ -537,7 +538,7 @@ export default function DisciplinesPage() {
                                 <div>
                                     <label style={labelStyle}>Кредитів ЄКТС</label>
                                     {isEditing ? (
-                                        <input style={inputStyle} type="number" min={0} value={editForm!.credits} onChange={e => setEditForm({ ...editForm!, credits: Number(e.target.value) })} />
+                                        <NumberInput style={inputStyle} min={0} value={editForm!.credits} onChange={v => setEditForm({ ...editForm!, credits: v })} />
                                     ) : (
                                         <div style={{ padding: '8px 11px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px', color: '#374151', border: '1px solid #e5e7eb' }}>{displayForm.credits}</div>
                                     )}
@@ -558,9 +559,9 @@ export default function DisciplinesPage() {
                                 <div key={field}>
                                     <label style={labelStyle}>{label}</label>
                                     {isEditing ? (
-                                        <input style={inputStyle} type="number" min={0}
+                                        <NumberInput style={inputStyle} min={0}
                                             value={editForm![field] as number}
-                                            onChange={e => setEditForm({ ...editForm!, [field]: Number(e.target.value) })} />
+                                            onChange={v => setEditForm({ ...editForm!, [field]: v })} />
                                     ) : (
                                         <div style={{ padding: '8px 11px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#111827', border: '1px solid #e5e7eb' }}>
                                             {displayForm[field] as number}

@@ -9,6 +9,7 @@ import { getScientificWorksByStaff } from '../services/scientificWorks'
 import { getTeachingLoadLimit, getWorkloadCeiling } from '../utils/workload'
 import { useSettings } from '../contexts/SettingsContext'
 import { WORKLOAD_TYPE_META, SCIENTIFIC_WORK_TYPES } from '../utils/lawNorms'
+import NumberInput from '../components/NumberInput'
 import type { Staff } from '../types/database'
 import { Users, Plus, Trash2, X, Save, Shield, User, Edit2, BookOpen, ChevronUp, Gauge, Search, GraduationCap, ArrowLeft } from 'lucide-react'
 import Select from '../components/Select'
@@ -274,7 +275,7 @@ export default function StaffPage() {
                         </div>
                         <div>
                             <label style={lbl}>Вислуга (р.)</label>
-                            <input style={inputStyle} type="number" min={0} value={addForm.service_years} onChange={e => setAddForm({ ...addForm, service_years: Number(e.target.value) })} />
+                            <NumberInput style={inputStyle} min={0} value={addForm.service_years} onChange={v => setAddForm({ ...addForm, service_years: v })} />
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -366,11 +367,11 @@ export default function StaffPage() {
                                     }}>
                                         {s.is_military ? <Shield size={16} color="#3b82f6" /> : <User size={16} color="#9ca3af" />}
                                     </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ flex: '0 1 360px', minWidth: 0 }}>
                                         <div style={{ fontSize: '13px', fontWeight: '600', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {s.full_name}
                                         </div>
-                                        <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
+                                        <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {s.position} · {d ? `Каф.№${d.number}` : '—'} · {s.rate} ст.
                                         </div>
                                     </div>
@@ -404,7 +405,7 @@ export default function StaffPage() {
                                         </div>
                                     )}
                                     <button onClick={e => { e.stopPropagation(); if (confirm(`Видалити "${s.full_name}"?`)) deleteMutation.mutate(s.id) }}
-                                        style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '2px', flexShrink: 0 }}>
+                                        style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '2px', flexShrink: 0, marginLeft: 'auto' }}>
                                         <Trash2 size={13} />
                                     </button>
                                 </div>
@@ -510,7 +511,7 @@ export default function StaffPage() {
                                 <div>
                                     <label style={lbl}>Вислуга (р.)</label>
                                     {isEditing ? (
-                                        <input style={inputStyle} type="number" min={0} value={editForm.service_years} onChange={e => setEditForm({ ...editForm, service_years: Number(e.target.value) })} />
+                                        <NumberInput style={inputStyle} min={0} value={editForm.service_years} onChange={v => setEditForm({ ...editForm, service_years: v })} />
                                     ) : (
                                         <div style={{ padding: '8px 11px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px', color: '#374151', border: '1px solid #e5e7eb' }}>{selectedStaff.service_years} р.</div>
                                     )}
@@ -583,25 +584,49 @@ export default function StaffPage() {
                                     Призначень немає
                                 </div>
                             ) : (
-                                <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {disciplineGroups.map((g, i) => (
-                                        <div key={i} style={{ padding: '10px 12px', background: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                                                <div style={{ fontSize: '13px', fontWeight: '600', color: '#111827', flex: 1, marginRight: '8px' }}>{g.name}</div>
-                                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#374151', whiteSpace: 'nowrap' }}>{g.totalHours} год</div>
-                                            </div>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                                {g.types.map((t, j) => (
-                                                    <span key={j} style={{
-                                                        fontSize: '11px', padding: '2px 8px', borderRadius: '10px', fontWeight: '500',
-                                                        background: t.color + '18', color: t.color, border: `1px solid ${t.color}30`,
+                                <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    {[...disciplineGroups.reduce((map, g) => {
+                                        const arr = map.get(g.semester) ?? []
+                                        arr.push(g)
+                                        return map.set(g.semester, arr)
+                                    }, new Map<number, typeof disciplineGroups>()).entries()].map(([sem, groups]) => {
+                                        const semHours = Math.round(groups.reduce((s, g) => s + g.totalHours, 0) * 100) / 100
+                                        return (
+                                            <div key={sem} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{
+                                                        fontSize: '11px', fontWeight: '700', color: '#ea580c',
+                                                        background: '#fff7ed', border: '1px solid #fed7aa',
+                                                        borderRadius: '6px', padding: '2px 8px', whiteSpace: 'nowrap',
                                                     }}>
-                                                        {t.label} · {t.hours}г
+                                                        {sem > 0 ? `${sem} семестр` : 'Без семестру'}
                                                     </span>
+                                                    <div style={{ flex: 1, height: '1px', background: '#f3f4f6' }} />
+                                                    <span style={{ fontSize: '11px', fontWeight: '600', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                                                        {groups.length} дисц. · {semHours} год
+                                                    </span>
+                                                </div>
+                                                {groups.map((g, i) => (
+                                                    <div key={i} style={{ padding: '10px 12px', background: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                                                            <div style={{ fontSize: '13px', fontWeight: '600', color: '#111827', flex: 1, marginRight: '8px' }}>{g.name}</div>
+                                                            <div style={{ fontSize: '12px', fontWeight: '700', color: '#374151', whiteSpace: 'nowrap' }}>{g.totalHours} год</div>
+                                                        </div>
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                            {g.types.map((t, j) => (
+                                                                <span key={j} style={{
+                                                                    fontSize: '11px', padding: '2px 8px', borderRadius: '10px', fontWeight: '500',
+                                                                    background: t.color + '18', color: t.color, border: `1px solid ${t.color}30`,
+                                                                }}>
+                                                                    {t.label} · {t.hours}г
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
                                                 ))}
                                             </div>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             )}
                         </div>

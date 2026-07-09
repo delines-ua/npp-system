@@ -5,6 +5,7 @@ import { DEFAULT_WORKLOAD_SETTINGS, type WorkloadSettings } from '../utils/setti
 import { resetWorkloadAssignments } from '../services/workloadAssignments'
 import { resetInstituteGroups } from '../services/instituteGroups'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
+import NumberInput from '../components/NumberInput'
 import { Settings as SettingsIcon, Save, RotateCcw, Check, ShieldAlert, Trash2, Layers, ClipboardList } from 'lucide-react'
 
 const card: React.CSSProperties = {
@@ -113,15 +114,15 @@ export default function SettingsPage() {
                 }}>
                     <div>
                         <label style={lbl}>Цивільні (год / ставка)</label>
-                        <input type="number" min={0} disabled={draft.mode !== 'override'} style={inputStyle}
+                        <NumberInput min={0} disabled={draft.mode !== 'override'} style={inputStyle}
                             value={draft.overrideCivilian}
-                            onChange={e => setDraft({ ...draft, overrideCivilian: Number(e.target.value) })} />
+                            onChange={v => setDraft({ ...draft, overrideCivilian: v })} />
                     </div>
                     <div>
                         <label style={lbl}>Військовослужбовці (год / ставка)</label>
-                        <input type="number" min={0} disabled={draft.mode !== 'override'} style={inputStyle}
+                        <NumberInput min={0} disabled={draft.mode !== 'override'} style={inputStyle}
                             value={draft.overrideMilitary}
-                            onChange={e => setDraft({ ...draft, overrideMilitary: Number(e.target.value) })} />
+                            onChange={v => setDraft({ ...draft, overrideMilitary: v })} />
                     </div>
                 </div>
 

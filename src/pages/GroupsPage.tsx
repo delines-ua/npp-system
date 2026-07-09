@@ -11,6 +11,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import type { InstituteGroup } from '../types/database'
 import { Layers, Plus, Trash2, Save, X, Edit2, Search, Upload, FileSpreadsheet, ChevronUp, GraduationCap, Users, Filter } from 'lucide-react'
 import Select from '../components/Select'
+import NumberInput from '../components/NumberInput'
 
 const card: React.CSSProperties = {
     background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '16px',
@@ -323,7 +324,7 @@ function GroupFields({ form, setForm, courseOptions, mastersOptions }: {
             </div>
             <div>
                 <label style={lbl}>Факультет</label>
-                <input style={inputStyle} type="number" min={1} value={form.faculty} onChange={e => setForm({ ...form, faculty: Number(e.target.value) })} />
+                <NumberInput style={inputStyle} min={1} value={form.faculty} onChange={v => setForm({ ...form, faculty: v })} />
             </div>
             <div>
                 <label style={lbl}>Курс</label>
@@ -343,7 +344,7 @@ function GroupFields({ form, setForm, courseOptions, mastersOptions }: {
             </div>
             <div>
                 <label style={lbl}>За списком</label>
-                <input style={inputStyle} type="number" min={0} value={form.student_count} onChange={e => setForm({ ...form, student_count: Number(e.target.value) })} />
+                <NumberInput style={inputStyle} min={0} value={form.student_count} onChange={v => setForm({ ...form, student_count: v })} />
             </div>
         </div>
     )
