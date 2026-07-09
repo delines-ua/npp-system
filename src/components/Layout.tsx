@@ -24,6 +24,7 @@ const links = [
 
 const SIDEBAR_FULL = 240
 const SIDEBAR_MINI = 64
+const APP_VERSION = '1.01'
 
 export default function Layout() {
     const [collapsed, setCollapsed] = useState(false)
@@ -146,6 +147,19 @@ export default function Layout() {
                         {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
                     </button>
                 </div>
+
+                {/* Version */}
+                <div style={{
+                    padding: '8px 12px',
+                    borderTop: '1px solid rgba(255,255,255,0.06)',
+                    textAlign: 'center',
+                    fontSize: '11px',
+                    color: '#6c6c5c',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                }}>
+                    {collapsed ? `v${APP_VERSION}` : `Версія ${APP_VERSION}`}
+                </div>
             </aside>
 
             {/* Main */}
@@ -164,6 +178,17 @@ export default function Layout() {
                     top: 0,
                     zIndex: 50,
                 }}>
+                    {/* Version */}
+                    <span style={{
+                        position: 'absolute',
+                        bottom: '3px',
+                        right: '28px',
+                        fontSize: '10px',
+                        color: '#c0c4cc',
+                        fontWeight: 500,
+                    }}>
+                        v{APP_VERSION}
+                    </span>
                     <div style={{ fontSize: '13px', color: '#9ca3af' }}>
                         Військовий інститут телекомунікацій та інформатизації імені Героїв Крут
                     </div>
