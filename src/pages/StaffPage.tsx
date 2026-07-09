@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getStaff, createStaff, updateStaff, deleteStaff } from '../services/staff'
 import { getDepartments } from '../services/departments'
@@ -9,7 +10,7 @@ import { getTeachingLoadLimit, getWorkloadCeiling } from '../utils/workload'
 import { useSettings } from '../contexts/SettingsContext'
 import { WORKLOAD_TYPE_META, SCIENTIFIC_WORK_TYPES } from '../utils/lawNorms'
 import type { Staff } from '../types/database'
-import { Users, Plus, Trash2, X, Save, Shield, User, Edit2, BookOpen, ChevronUp, Gauge, Search, GraduationCap } from 'lucide-react'
+import { Users, Plus, Trash2, X, Save, Shield, User, Edit2, BookOpen, ChevronUp, Gauge, Search, GraduationCap, ArrowLeft } from 'lucide-react'
 import Select from '../components/Select'
 
 const POSITIONS = [
@@ -46,9 +47,13 @@ const emptyForm = (): FormData => ({
 export default function StaffPage() {
     const queryClient = useQueryClient()
     const { settings, academicYear } = useSettings()
+    const [searchParams, setSearchParams] = useSearchParams()
+    // Перехід із іншої сторінки з ?staff=<id> — одразу відкриваємо картку НПП
+    const staffParam = searchParams.get('staff')
+    const cameFromLink = useRef(!!staffParam)
     const [selectedDept, setSelectedDept] = useState('')
     const [search, setSearch] = useState('')
-    const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
+    const [selectedStaffId, setSelectedStaffId] = useState<string | null>(staffParam)
     const [isEditing, setIsEditing] = useState(false)
     const [editForm, setEditForm] = useState<FormData | null>(null)
     const [showAddForm, setShowAddForm] = useState(false)
@@ -56,11 +61,22 @@ export default function StaffPage() {
 
     const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: getDepartments })
     useEffect(() => {
-        if (!selectedDept && departments?.length) {
+        // Дефолтна кафедра (№22) — крім випадку переходу за прямим посиланням на НПП,
+        // де показуємо всі кафедри, щоб потрібний НПП точно був у списку
+        if (!cameFromLink.current && !selectedDept && departments?.length) {
             const d = departments.find(d => d.number === '22')
             if (d) setSelectedDept(d.id)
         }
     }, [departments])
+
+    // Прибираємо ?staff з URL після використання (щоб не відкривалось повторно)
+    useEffect(() => {
+        if (staffParam) {
+            searchParams.delete('staff')
+            setSearchParams(searchParams, { replace: true })
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     const { data: staff = [], isLoading } = useQuery({
         queryKey: ['staff', selectedDept],
@@ -102,6 +118,26 @@ export default function StaffPage() {
         return { available, allocated, remaining, usedPct, overloaded: allocated > available }
     }, [staff, deptAssignments, settings])
 
+    // Години кожного НПП по семестрах (навчальне навантаження за призначеннями)
+    const staffHours = useMemo(() => {
+        const discSem = new Map(allDisciplines.map(d => [d.id, d.semester]))
+        const map: Record<string, { sem1: number; sem2: number; total: number }> = {}
+        for (const a of deptAssignments) {
+            const row = map[a.staff_id] ?? (map[a.staff_id] = { sem1: 0, sem2: 0, total: 0 })
+            // Непарні семестри (1,3,5,7) — осінь (1-й сем.), парні (2,4,6,8) — весна (2-й сем.)
+            const sem = discSem.get(a.discipline_id)
+            if (sem && sem % 2 === 1) row.sem1 += a.hours
+            else if (sem && sem % 2 === 0) row.sem2 += a.hours
+            row.total += a.hours
+        }
+        for (const k in map) {
+            map[k].sem1 = Math.round(map[k].sem1 * 100) / 100
+            map[k].sem2 = Math.round(map[k].sem2 * 100) / 100
+            map[k].total = Math.round(map[k].total * 100) / 100
+        }
+        return map
+    }, [deptAssignments, allDisciplines])
+
     const invStaff = () => queryClient.invalidateQueries({ queryKey: ['staff', selectedDept] })
 
     const createMutation = useMutation({
@@ -128,6 +164,12 @@ export default function StaffPage() {
     }, [staff, search])
 
     const selectedStaff = staff.find(s => s.id === selectedStaffId) ?? null
+
+    // Синхронізуємо форму, коли НПП обрано без кліку (перехід за посиланням ?staff=)
+    useEffect(() => {
+        if (selectedStaff && !isEditing && !editForm) setEditForm({ ...selectedStaff })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedStaff?.id])
 
     const handleStaffClick = (s: Staff) => {
         setSelectedStaffId(s.id)
@@ -304,6 +346,10 @@ export default function StaffPage() {
                         {filteredStaff.map(s => {
                             const isSelected = s.id === selectedStaffId
                             const d = dept(s.department_id)
+                            const h = staffHours[s.id] ?? { sem1: 0, sem2: 0, total: 0 }
+                            const limit = getTeachingLoadLimit(s, settings)
+                            const pct = limit > 0 ? Math.min(Math.round((h.total / limit) * 100), 100) : 0
+                            const isOver = h.total > limit
                             return (
                                 <div key={s.id} onClick={() => handleStaffClick(s)}
                                     style={{
@@ -328,6 +374,35 @@ export default function StaffPage() {
                                             {s.position} · {d ? `Каф.№${d.number}` : '—'} · {s.rate} ст.
                                         </div>
                                     </div>
+                                    {/* Години по семестрах — показуємо у розгорнутому (табличному) вигляді */}
+                                    {!selectedStaffId && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                            {/* Два семестри в одному прямокутнику */}
+                                            <div style={{ display: 'flex', background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '8px', overflow: 'hidden' }}>
+                                                <div style={{ padding: '3px 10px', textAlign: 'center', borderRight: '1px solid #eef0f2' }}>
+                                                    <div style={{ fontSize: '9px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.3px', lineHeight: 1.2 }}>1 сем</div>
+                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', lineHeight: 1.3 }}>{h.sem1}</div>
+                                                </div>
+                                                <div style={{ padding: '3px 10px', textAlign: 'center' }}>
+                                                    <div style={{ fontSize: '9px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.3px', lineHeight: 1.2 }}>2 сем</div>
+                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', lineHeight: 1.3 }}>{h.sem2}</div>
+                                                </div>
+                                            </div>
+                                            {/* Всього + прогрес-бар */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px' }}>
+                                                <div style={{ textAlign: 'center' }}>
+                                                    <div style={{ fontSize: '9px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.3px', lineHeight: 1.2 }}>Всього</div>
+                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: isOver ? '#dc2626' : '#ea580c', lineHeight: 1.3 }}>{h.total}</div>
+                                                </div>
+                                                <div style={{ width: '54px' }} title={`${h.total} / ${limit} год`}>
+                                                    <div style={{ height: '6px', background: '#fde8d5', borderRadius: '3px', overflow: 'hidden' }}>
+                                                        <div style={{ height: '100%', width: `${pct}%`, background: isOver ? '#ef4444' : '#f97316', borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                                                    </div>
+                                                    <div style={{ fontSize: '9px', color: '#9ca3af', textAlign: 'right', marginTop: '2px', lineHeight: 1 }}>{pct}%</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                     <button onClick={e => { e.stopPropagation(); if (confirm(`Видалити "${s.full_name}"?`)) deleteMutation.mutate(s.id) }}
                                         style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '2px', flexShrink: 0 }}>
                                         <Trash2 size={13} />
@@ -344,6 +419,12 @@ export default function StaffPage() {
 
                         {/* Info card */}
                         <div style={{ ...card, padding: '20px' }}>
+                            {/* Back to list (table view) */}
+                            <button onClick={() => { setSelectedStaffId(null); setIsEditing(false) }}
+                                style={{ padding: '7px 14px', marginBottom: '16px', background: '#fff', color: '#374151', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <ArrowLeft size={14} /> До списку
+                            </button>
+
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
                                     <div style={{

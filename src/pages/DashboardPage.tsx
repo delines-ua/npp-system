@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDepartments } from '../services/departments'
 import { getStaff } from '../services/staff'
@@ -29,6 +30,7 @@ const TYPE_COLORS: Record<string, string> = {
 const PIE_COLORS = ['#f97316', '#3b82f6', '#22c55e', '#8b5cf6', '#06b6d4', '#f59e0b']
 
 export default function DashboardPage() {
+    const navigate = useNavigate()
     const { academicYear } = useSettings()
     const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: getDepartments })
     const { data: staff } = useQuery({ queryKey: ['staff'], queryFn: () => getStaff() })
@@ -199,7 +201,13 @@ export default function DashboardPage() {
                             </div>
                             {staffChartData.map(s => (
                                 <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '116px 1fr 64px', alignItems: 'center', gap: '10px' }}>
-                                    <div style={{ fontSize: '12px', color: '#374151', fontWeight: '500', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    <div
+                                        onClick={() => navigate(`/staff?staff=${s.id}`)}
+                                        title={`Відкрити картку · ${s.name}`}
+                                        style={{ fontSize: '12px', color: '#374151', fontWeight: '500', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}
+                                        onMouseEnter={e => { e.currentTarget.style.color = '#f97316'; e.currentTarget.style.textDecoration = 'underline' }}
+                                        onMouseLeave={e => { e.currentTarget.style.color = '#374151'; e.currentTarget.style.textDecoration = 'none' }}
+                                    >
                                         {s.name}
                                     </div>
                                     <div style={{ height: '20px', background: '#f3f4f6', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
@@ -220,7 +228,7 @@ export default function DashboardPage() {
                                         )}
                                     </div>
                                     <div style={{ fontSize: '12px', fontWeight: '700', color: s.isOver ? '#dc2626' : s.isWarn ? '#d97706' : '#6b7280', textAlign: 'right' }}>
-                                        {s.used}г
+                                        {s.used} год
                                     </div>
                                 </div>
                             ))}
@@ -276,7 +284,7 @@ export default function DashboardPage() {
                                         <div key={d.name}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                                                 <span style={{ fontSize: '12px', color: '#374151', fontWeight: '500' }}>{d.name}</span>
-                                                <span style={{ fontSize: '11px', color: d.color, fontWeight: '700' }}>{d.value}г · {pct}%</span>
+                                                <span style={{ fontSize: '11px', color: d.color, fontWeight: '700' }}>{d.value} год · {pct}%</span>
                                             </div>
                                             <div style={{ height: '5px', background: '#f3f4f6', borderRadius: '3px', overflow: 'hidden' }}>
                                                 <div style={{ height: '100%', width: `${pct}%`, background: d.color, borderRadius: '3px', transition: 'width 0.4s' }} />

@@ -1,10 +1,13 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDisciplines, createDiscipline, updateDiscipline, deleteDiscipline } from '../services/disciplines'
 import { getDepartments } from '../services/departments'
-import { EDUCATION_LEVELS } from '../utils/lawNorms'
-import type { Discipline } from '../types/database'
-import { BookOpen, Plus, Trash2, X, Save, Search, Edit2, ChevronUp } from 'lucide-react'
+import { getDetailedAssignments } from '../services/workloadAssignments'
+import { getStaff } from '../services/staff'
+import { EDUCATION_LEVELS, WORKLOAD_TYPE_META } from '../utils/lawNorms'
+import type { Discipline, WorkloadTypeKey, DetailedAssignment, Staff } from '../types/database'
+import { BookOpen, Plus, Trash2, X, Save, Search, Edit2, ChevronUp, Users, GraduationCap, ArrowLeft } from 'lucide-react'
 import Select from '../components/Select'
 import { useSettings } from '../contexts/SettingsContext'
 
@@ -27,6 +30,35 @@ const labelStyle: React.CSSProperties = {
     display: 'block', fontSize: '11px', color: '#6b7280', marginBottom: '4px', fontWeight: '500',
 }
 
+const TYPE_ORDER = Object.keys(WORKLOAD_TYPE_META) as WorkloadTypeKey[]
+
+type TeacherEntry = { id: string; name: string; isLecturer: boolean; total: number; types: { type: WorkloadTypeKey; hours: number }[] }
+
+// Групуємо призначення по НПП: лектори (мають лекції) — першими, далі решта
+function groupTeachers(assignments: DetailedAssignment[], staff: Staff[]): TeacherEntry[] {
+    const map = new Map<string, { id: string; name: string; isLecturer: boolean; total: number; byType: Map<WorkloadTypeKey, number> }>()
+    for (const a of assignments) {
+        let e = map.get(a.staff_id)
+        if (!e) {
+            const s = staff.find(x => x.id === a.staff_id)
+            e = { id: a.staff_id, name: s?.full_name ?? '—', isLecturer: false, total: 0, byType: new Map() }
+            map.set(a.staff_id, e)
+        }
+        if (a.workload_type === 'lecture') e.isLecturer = true
+        e.total = Math.round((e.total + a.hours) * 100) / 100
+        e.byType.set(a.workload_type, Math.round(((e.byType.get(a.workload_type) ?? 0) + a.hours) * 100) / 100)
+    }
+    return Array.from(map.values())
+        .map(e => ({
+            id: e.id, name: e.name, isLecturer: e.isLecturer, total: e.total,
+            types: TYPE_ORDER.filter(t => e.byType.has(t)).map(t => ({ type: t, hours: e.byType.get(t)! })),
+        }))
+        .sort((a, b) =>
+            (a.isLecturer === b.isLecturer ? 0 : a.isLecturer ? -1 : 1) ||
+            (b.total - a.total) ||
+            a.name.localeCompare(b.name, 'uk'))
+}
+
 type FormData = Omit<Discipline, 'id'>
 
 const emptyForm = (): FormData => ({
@@ -41,6 +73,7 @@ const emptyForm = (): FormData => ({
 
 export default function DisciplinesPage() {
     const queryClient = useQueryClient()
+    const navigate = useNavigate()
     const { academicYear } = useSettings()
 
     const [selectedDept, setSelectedDept] = useState('')
@@ -66,6 +99,33 @@ export default function DisciplinesPage() {
         queryFn: () => getDisciplines(selectedDept || undefined, academicYear),
         enabled: !!selectedDept,
     })
+
+    // Призначені викладачі для всіх дисциплін кафедри
+    const disciplineIds = useMemo(() => disciplines.map(d => d.id), [disciplines])
+    const { data: allAssignments = [] } = useQuery({
+        queryKey: ['disc-assignments', selectedDept, academicYear, disciplineIds],
+        queryFn: () => getDetailedAssignments(disciplineIds),
+        enabled: disciplineIds.length > 0,
+    })
+    const { data: allStaff = [] } = useQuery({
+        queryKey: ['staff-all'],
+        queryFn: () => getStaff(),
+    })
+
+    // Мапа discipline_id → список викладачів (лектори першими)
+    const teachersByDisc = useMemo(() => {
+        const byDisc = new Map<string, DetailedAssignment[]>()
+        for (const a of allAssignments) {
+            const arr = byDisc.get(a.discipline_id)
+            if (arr) arr.push(a)
+            else byDisc.set(a.discipline_id, [a])
+        }
+        const result = new Map<string, TeacherEntry[]>()
+        for (const [discId, list] of byDisc) result.set(discId, groupTeachers(list, allStaff))
+        return result
+    }, [allAssignments, allStaff])
+
+    const assignedTeachers = selectedDiscId ? teachersByDisc.get(selectedDiscId) ?? [] : []
 
     const invDisc = () => queryClient.invalidateQueries({ queryKey: ['disciplines'] })
 
@@ -255,13 +315,14 @@ export default function DisciplinesPage() {
                         )}
                         {filteredDiscs.map(disc => {
                             const isSelected = disc.id === selectedDiscId
+                            const teachers = teachersByDisc.get(disc.id) ?? []
                             return (
                                 <div key={disc.id} onClick={() => handleDiscClick(disc)}
                                     style={{
                                         padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f9fafb',
                                         background: isSelected ? '#fff7ed' : 'transparent',
                                         borderLeft: `3px solid ${isSelected ? '#f97316' : 'transparent'}`,
-                                        display: 'flex', alignItems: 'flex-start', gap: '8px',
+                                        display: 'flex', alignItems: 'flex-start', gap: '10px',
                                     }}>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ fontSize: '13px', fontWeight: '500', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -276,6 +337,26 @@ export default function DisciplinesPage() {
                                             {disc.education_level.replace(/^\d+_/, '')} · Сем.{disc.semester} · {disc.student_count} ос.
                                         </div>
                                     </div>
+                                    {/* Призначені викладачі — у розгорнутому (табличному) вигляді, лектори першими */}
+                                    {!selectedDiscId && teachers.length > 0 && (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'flex-end', maxWidth: '46%', flexShrink: 0 }}>
+                                            {teachers.map((t, i) => (
+                                                <span key={i} onClick={e => { e.stopPropagation(); navigate(`/staff?staff=${t.id}`) }}
+                                                    title={`Відкрити картку · ${t.name}${t.isLecturer ? ' · лектор' : ''}`}
+                                                    style={{
+                                                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                                        fontSize: '11px', fontWeight: t.isLecturer ? 600 : 500,
+                                                        padding: '2px 8px', borderRadius: '10px', whiteSpace: 'nowrap', cursor: 'pointer',
+                                                        background: t.isLecturer ? '#eff6ff' : '#f3f4f6',
+                                                        color: t.isLecturer ? '#1d4ed8' : '#6b7280',
+                                                        border: `1px solid ${t.isLecturer ? '#bfdbfe' : '#e5e7eb'}`,
+                                                    }}>
+                                                    {t.isLecturer && <GraduationCap size={11} />}
+                                                    {t.name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                     <button onClick={e => { e.stopPropagation(); if (confirm(`Видалити "${disc.name}"?`)) deleteMutation.mutate(disc.id) }}
                                         style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '2px', flexShrink: 0, marginTop: '2px' }}>
                                         <Trash2 size={13} />
@@ -289,6 +370,12 @@ export default function DisciplinesPage() {
                 {/* Detail / Edit panel */}
                 {selectedDisc && displayForm && (
                     <div style={{ ...card, padding: '22px' }}>
+                        {/* Back to list (table view) */}
+                        <button onClick={() => { setSelectedDiscId(null); setIsEditing(false) }}
+                            style={{ padding: '7px 14px', marginBottom: '16px', background: '#fff', color: '#374151', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <ArrowLeft size={14} /> До списку
+                        </button>
+
                         {/* Header */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                             <div style={{ flex: 1, minWidth: 0, paddingRight: '12px' }}>
@@ -319,6 +406,63 @@ export default function DisciplinesPage() {
                                     </>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Assigned teachers — лектори першими, далі решта */}
+                        <div style={{ marginBottom: '18px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                                <Users size={13} color="#9ca3af" />
+                                <span style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    Призначені викладачі{assignedTeachers.length > 0 ? ` (${assignedTeachers.length})` : ''}
+                                </span>
+                            </div>
+                            {assignedTeachers.length === 0 ? (
+                                <div style={{ padding: '14px', textAlign: 'center', fontSize: '13px', color: '#9ca3af', background: '#f9fafb', borderRadius: '10px', border: '1px dashed #e5e7eb' }}>
+                                    {selectedDisc.is_thesis
+                                        ? 'Керівники призначаються на сторінці «Наукові роботи»'
+                                        : 'Викладачів не призначено — розподіл на сторінці «Розподіл»'}
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {assignedTeachers.map((t, i) => (
+                                        <div key={i} style={{
+                                            display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                                            background: t.isLecturer ? '#eff6ff' : '#f9fafb',
+                                            borderRadius: '10px', border: `1px solid ${t.isLecturer ? '#bfdbfe' : '#f3f4f6'}`,
+                                        }}>
+                                            {t.isLecturer && (
+                                                <span title="Лектор" style={{ display: 'flex', flexShrink: 0 }}>
+                                                    <GraduationCap size={15} color="#3b82f6" />
+                                                </span>
+                                            )}
+                                            <span onClick={() => navigate(`/staff?staff=${t.id}`)}
+                                                title={`Відкрити картку · ${t.name}`}
+                                                style={{ fontSize: '13px', fontWeight: '600', color: '#111827', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                                                onMouseEnter={e => { e.currentTarget.style.color = '#f97316'; e.currentTarget.style.textDecoration = 'underline' }}
+                                                onMouseLeave={e => { e.currentTarget.style.color = '#111827'; e.currentTarget.style.textDecoration = 'none' }}
+                                            >
+                                                {t.name}
+                                            </span>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'flex-end' }}>
+                                                {t.types.map((ty, j) => {
+                                                    const meta = WORKLOAD_TYPE_META[ty.type]
+                                                    return (
+                                                        <span key={j} style={{
+                                                            fontSize: '11px', padding: '2px 8px', borderRadius: '10px', fontWeight: '500', whiteSpace: 'nowrap',
+                                                            background: meta.color + '18', color: meta.color, border: `1px solid ${meta.color}30`,
+                                                        }}>
+                                                            {meta.label} · {ty.hours}г
+                                                        </span>
+                                                    )
+                                                })}
+                                            </div>
+                                            <span style={{ fontSize: '12px', fontWeight: '700', color: '#374151', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                                {t.total}г
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Top row: level + semester + academic year */}
