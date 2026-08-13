@@ -1,13 +1,14 @@
-import { useState, useMemo, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDisciplines, createDiscipline, updateDiscipline, deleteDiscipline } from '../services/disciplines'
 import { getDepartments } from '../services/departments'
-import { getDetailedAssignments } from '../services/workloadAssignments'
+import { getDetailedAssignments, syncAssignmentsAfterHoursChange } from '../services/workloadAssignments'
+import { getApplicableSlots } from '../utils/workload'
 import { getStaff } from '../services/staff'
 import { EDUCATION_LEVELS, WORKLOAD_TYPE_META } from '../utils/lawNorms'
 import type { Discipline, WorkloadTypeKey, DetailedAssignment, Staff } from '../types/database'
-import { BookOpen, Plus, Trash2, X, Save, Search, Edit2, ChevronUp, Users, GraduationCap, ArrowLeft } from 'lucide-react'
+import { BookOpen, Plus, Trash2, X, Save, Search, Edit2, ChevronUp, Users, GraduationCap, ArrowLeft, Layers } from 'lucide-react'
 import Select from '../components/Select'
 import NumberInput from '../components/NumberInput'
 import { useSettings } from '../contexts/SettingsContext'
@@ -76,9 +77,12 @@ export default function DisciplinesPage() {
     const queryClient = useQueryClient()
     const navigate = useNavigate()
     const { academicYear } = useSettings()
+    const [searchParams, setSearchParams] = useSearchParams()
+    const discParam = searchParams.get('disc')
+    const cameFromLink = useRef(!!discParam)
 
     const [selectedDept, setSelectedDept] = useState('')
-    const [selectedDiscId, setSelectedDiscId] = useState<string | null>(null)
+    const [selectedDiscId, setSelectedDiscId] = useState<string | null>(discParam)
     const [discFilter, setDiscFilter] = useState('')
     const [filterLevel, setFilterLevel] = useState('')
     const [filterSem, setFilterSem] = useState<'' | '1' | '2'>('')
@@ -89,16 +93,27 @@ export default function DisciplinesPage() {
 
     const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: getDepartments })
     useEffect(() => {
-        if (!selectedDept && departments?.length) {
+        // Дефолтна кафедра (№22) — крім випадку переходу за прямим посиланням на дисципліну,
+        // де показуємо всі кафедри, щоб потрібна дисципліна була в списку
+        if (!cameFromLink.current && !selectedDept && departments?.length) {
             const d = departments.find(d => d.number === '22')
             if (d) setSelectedDept(d.id)
         }
     }, [departments])
 
+    // Прибираємо ?disc з URL після використання (щоб не відкривалось повторно)
+    useEffect(() => {
+        if (discParam) {
+            searchParams.delete('disc')
+            setSearchParams(searchParams, { replace: true })
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     const { data: disciplines = [], isLoading } = useQuery({
         queryKey: ['disciplines', selectedDept, academicYear],
         queryFn: () => getDisciplines(selectedDept || undefined, academicYear),
-        enabled: !!selectedDept,
+        enabled: !!selectedDept || cameFromLink.current,
     })
 
     // Призначені викладачі для всіх дисциплін кафедри
@@ -131,13 +146,44 @@ export default function DisciplinesPage() {
     const invDisc = () => queryClient.invalidateQueries({ queryKey: ['disciplines'] })
 
     const createMutation = useMutation({
-        mutationFn: () => createDiscipline({ ...addForm, academic_year: academicYear }),
+        mutationFn: () => {
+            const slots = getApplicableSlots(addForm as Discipline)
+            const computedTotal = Math.round(slots.reduce((s, sl) => s + sl.hours, 0) * 10) / 10
+            return createDiscipline({ ...addForm, total_hours: computedTotal, academic_year: academicYear })
+        },
         onSuccess: () => { invDisc(); setAddForm(emptyForm()); setShowAddForm(false) },
     })
 
     const updateMutation = useMutation({
-        mutationFn: () => updateDiscipline(selectedDiscId!, editForm!),
-        onSuccess: () => { invDisc(); setIsEditing(false) },
+        mutationFn: async () => {
+            const old = selectedDisc
+            const newForm = editForm!
+            const hourFields = ['total_hours', 'lecture_hours', 'group_hours', 'subgroup_hours',
+                'practice_hours', 'course_works', 'control_works', 'exams', 'credits'] as const
+            const changes: Record<string, { old: number; nv: number }> = {}
+            for (const f of hourFields) {
+                const ov = old[f] as number
+                const nv = newForm[f] as number
+                if (ov != null && ov !== nv) changes[f] = { old: ov, nv }
+            }
+            // Compute correct total_hours from slots so header = body sum
+            const slots = getApplicableSlots(newForm as Discipline)
+            const computedTotal = Math.round(slots.reduce((s, sl) => s + sl.hours, 0) * 10) / 10
+            const toSave = { ...newForm, total_hours: computedTotal }
+            await updateDiscipline(selectedDiscId!, toSave)
+            if (Object.keys(changes).length > 0) {
+                await syncAssignmentsAfterHoursChange(selectedDiscId!, {
+                    ...changes,
+                    total_hours: { old: old.total_hours, nv: computedTotal }
+                })
+            }
+        },
+        onSuccess: () => {
+            invDisc()
+            queryClient.invalidateQueries({ queryKey: ['detailed-assignments'] })
+            queryClient.invalidateQueries({ queryKey: ['disc-assignments'] })
+            setIsEditing(false)
+        },
     })
 
     const deleteMutation = useMutation({
@@ -154,6 +200,12 @@ export default function DisciplinesPage() {
     }), [disciplines, filterLevel, filterSem, discFilter])
 
     const selectedDisc = disciplines.find(d => d.id === selectedDiscId) ?? null
+
+    // Синхронізуємо форму, коли дисципліна обрана без кліку (перехід за посиланням ?disc=)
+    useEffect(() => {
+        if (selectedDisc && !isEditing && !editForm) setEditForm({ ...selectedDisc })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedDisc?.id])
 
     const handleDiscClick = (disc: Discipline) => {
         setSelectedDiscId(disc.id)
@@ -372,10 +424,18 @@ export default function DisciplinesPage() {
                 {selectedDisc && displayForm && (
                     <div style={{ ...card, padding: '22px' }}>
                         {/* Back to list (table view) */}
-                        <button onClick={() => { setSelectedDiscId(null); setIsEditing(false) }}
-                            style={{ padding: '7px 14px', marginBottom: '16px', background: '#fff', color: '#374151', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <ArrowLeft size={14} /> До списку
-                        </button>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <button onClick={() => { setSelectedDiscId(null); setIsEditing(false) }}
+                                style={{ padding: '7px 14px', background: '#fff', color: '#374151', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <ArrowLeft size={14} /> До списку
+                            </button>
+                            <Link to={`/workload?disc=${selectedDisc.id}&dept=${selectedDisc.department_id}`}
+                                style={{ padding: '7px 14px', background: '#fff', color: '#374151', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; e.currentTarget.style.borderColor = '#d1d5db' }}
+                                onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e5e7eb' }}>
+                                <Layers size={14} /> До розподілу
+                            </Link>
+                        </div>
 
                         {/* Header */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>

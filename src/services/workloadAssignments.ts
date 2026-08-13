@@ -57,6 +57,41 @@ export const clearSlot = async (
     if (error) throw error
 }
 
+// When discipline hours change, proportionally rescale all workload_assignments rows
+// so the body (assignments) stays in sync with the header (discipline).
+export const syncAssignmentsAfterHoursChange = async (
+    disciplineId: string,
+    changes: Record<string, { old: number; nv: number }>
+) => {
+    const fieldToType: Record<string, string> = {
+        lecture_hours: 'lecture',
+        group_hours: 'group',
+        subgroup_hours: 'practical',
+        practice_hours: 'practical',
+        course_works: 'course_work',
+        control_works: 'control_work',
+        exams: 'exam',
+        credits: 'credit',
+    }
+
+    const { data, error } = await supabase
+        .from('workload_assignments')
+        .select('*')
+        .eq('discipline_id', disciplineId)
+    if (error || !data) return
+
+    for (const a of data) {
+        const field = Object.keys(changes).find(f => fieldToType[f] === a.workload_type)
+        if (!field) continue
+        const { old, nv } = changes[field]
+        if (old == null || old === 0) continue
+        const newHours = Math.round((a.hours * nv / old) * 100) / 100
+        await supabase
+            .from('workload_assignments')
+            .update({ hours: newHours })
+            .eq('id', a.id)
+    }
+}
 export const assignThesis = async (
     disciplineId: string,
     staffId: string,
