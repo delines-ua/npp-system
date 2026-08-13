@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getStaff, createStaff, updateStaff, deleteStaff } from '../services/staff'
 import { getDepartments } from '../services/departments'
@@ -47,6 +47,7 @@ const emptyForm = (): FormData => ({
 
 export default function StaffPage() {
     const queryClient = useQueryClient()
+    const navigate = useNavigate()
     const { settings, academicYear } = useSettings()
     const [searchParams, setSearchParams] = useSearchParams()
     // Перехід із іншої сторінки з ?staff=<id> — одразу відкриваємо картку НПП
@@ -180,11 +181,11 @@ export default function StaffPage() {
 
     // Групуємо призначення по дисциплінах
     const disciplineGroups = useMemo(() => {
-        const map: Record<string, { name: string; semester: number; totalHours: number; types: { label: string; color: string; hours: number }[] }> = {}
+        const map: Record<string, { id: string; name: string; semester: number; totalHours: number; types: { label: string; color: string; hours: number }[] }> = {}
         for (const a of staffAssignments) {
             if (!map[a.discipline_id]) {
                 const disc = allDisciplines.find(d => d.id === a.discipline_id)
-                map[a.discipline_id] = { name: disc?.name ?? '—', semester: disc?.semester ?? 0, totalHours: 0, types: [] }
+                map[a.discipline_id] = { id: a.discipline_id, name: disc?.name ?? '—', semester: disc?.semester ?? 0, totalHours: 0, types: [] }
             }
             const meta = WORKLOAD_TYPE_META[a.workload_type as keyof typeof WORKLOAD_TYPE_META]
             map[a.discipline_id].totalHours = Math.round((map[a.discipline_id].totalHours + a.hours) * 100) / 100
@@ -609,7 +610,13 @@ export default function StaffPage() {
                                                 {groups.map((g, i) => (
                                                     <div key={i} style={{ padding: '10px 12px', background: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                                                            <div style={{ fontSize: '13px', fontWeight: '600', color: '#111827', flex: 1, marginRight: '8px' }}>{g.name}</div>
+                                                            <div onClick={() => navigate(`/disciplines?disc=${g.id}`)}
+                                                                 title={`Відкрити «${g.name}»`}
+                                                                 style={{ fontSize: '13px', fontWeight: '600', color: '#111827', flex: 1, marginRight: '8px', cursor: 'pointer' }}
+                                                                 onMouseEnter={e => { e.currentTarget.style.color = '#f97316'; e.currentTarget.style.textDecoration = 'underline' }}
+                                                                 onMouseLeave={e => { e.currentTarget.style.color = '#111827'; e.currentTarget.style.textDecoration = 'none' }}>
+                                                                {g.name}
+                                                            </div>
                                                             <div style={{ fontSize: '12px', fontWeight: '700', color: '#374151', whiteSpace: 'nowrap' }}>{g.totalHours} год</div>
                                                         </div>
                                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>

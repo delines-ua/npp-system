@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDepartments } from '../services/departments'
 import { getStaff } from '../services/staff'
@@ -48,9 +49,14 @@ const WORKLOAD_TYPE_COLOR: Record<string, string> = {
 export default function WorkloadDistributionPage() {
     const queryClient = useQueryClient()
     const { academicYear: ACADEMIC_YEAR, settings } = useSettings()
+    const [searchParams, setSearchParams] = useSearchParams()
+    const discParam = searchParams.get('disc')
+    const deptParam = searchParams.get('dept')
+    const cameFromLink = useRef(!!discParam)
+
     const [exporting, setExporting] = useState(false)
-    const [selectedDept, setSelectedDept] = useState('')
-    const [selectedDiscId, setSelectedDiscId] = useState<string | null>(null)
+    const [selectedDept, setSelectedDept] = useState(deptParam)
+    const [selectedDiscId, setSelectedDiscId] = useState<string | null>(discParam)
     const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
     const [discFilter, setDiscFilter] = useState('')
     const [filterSem, setFilterSem] = useState<'' | '1' | '2'>('')
@@ -68,11 +74,22 @@ export default function WorkloadDistributionPage() {
         queryFn: getDepartments,
     })
     useEffect(() => {
-        if (!selectedDept && departments?.length) {
+        // Skip auto-default dept when coming from a ?disc= link
+        if (!cameFromLink.current && !selectedDept && departments?.length) {
             const d = departments.find(d => d.number === '22')
             if (d) setSelectedDept(d.id)
         }
     }, [departments])
+
+    // Clean up ?disc, ?dept params after use
+    useEffect(() => {
+        if (discParam || deptParam) {
+            searchParams.delete('disc')
+            searchParams.delete('dept')
+            setSearchParams(searchParams, { replace: true })
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             if (staffPickerRef.current && !staffPickerRef.current.contains(e.target as Node)) {
@@ -90,7 +107,7 @@ export default function WorkloadDistributionPage() {
     const { data: disciplines = [] } = useQuery({
         queryKey: ['disciplines', selectedDept, ACADEMIC_YEAR],
         queryFn: () => getDisciplines(selectedDept || undefined, ACADEMIC_YEAR),
-        enabled: !!selectedDept,
+        enabled: !!selectedDept || cameFromLink.current,
     })
 
     const discIds = useMemo(() => disciplines.map(d => d.id), [disciplines])
