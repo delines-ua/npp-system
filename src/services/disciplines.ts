@@ -62,6 +62,11 @@ export const updateDiscipline = async (id: string, data: Partial<Omit<Discipline
 }
 
 export const deleteDiscipline = async (id: string): Promise<void> => {
+    // Видаляємо залежні записи — у схемі немає FK cascade.
+    await supabase.from('workload_assignments').delete().eq('discipline_id', id)
+    await supabase.from('staff_assignments').delete().eq('discipline_id', id)
+    await supabase.from('discipline_groups').delete().eq('discipline_id', id)
+
     const { error } = await supabase.from('disciplines').delete().eq('id', id)
     if (error) throw error
 }

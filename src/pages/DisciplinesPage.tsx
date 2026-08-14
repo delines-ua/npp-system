@@ -410,7 +410,7 @@ export default function DisciplinesPage() {
                                             ))}
                                         </div>
                                     )}
-                                    <button onClick={e => { e.stopPropagation(); if (confirm(`Видалити "${disc.name}"?`)) deleteMutation.mutate(disc.id) }}
+                                    <button onClick={e => { e.stopPropagation(); if (confirm(`Видалити "${disc.name}"?\n\nЦе видалить пов'язані призначення — навантаження викладачів зміниться!`)) deleteMutation.mutate(disc.id) }}
                                         style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '2px', flexShrink: 0, marginTop: '2px' }}>
                                         <Trash2 size={13} />
                                     </button>
