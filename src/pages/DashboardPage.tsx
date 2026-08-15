@@ -5,10 +5,12 @@ import { getDepartments } from '../services/departments'
 import { getStaff } from '../services/staff'
 import { getDisciplines } from '../services/disciplines'
 import { getDetailedAssignments } from '../services/workloadAssignments'
-import { getDisciplineStatus, getStaffHourLimit } from '../utils/workload'
+import { getDisciplineStatus } from '../utils/workload'
 import { Users, BookOpen, Clock, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useSettings } from '../contexts/SettingsContext'
+
+const WORKLOAD_CHART_NORM = 600
 
 const card: React.CSSProperties = {
     background: '#ffffff',
@@ -83,9 +85,12 @@ export default function DashboardPage() {
     const assignPercent = totalDiscHours > 0 ? Math.round((totalAssigned / totalDiscHours) * 100) : 0
 
     // Staff chart rows
+    // Шкала прогрес-бару прив'язана до орієнтовної норми навчального навантаження (600 год),
+    // а не до повного річного службового часу (getStaffHourLimit, 1500-3000+ год) —
+    // інакше бар для типового навантаження виглядає майже порожнім.
     const staffChartData = useMemo(() => (staff || []).map(s => {
         const used = Math.round((staffHoursMap[s.id] || 0) * 100) / 100
-        const limit = getStaffHourLimit(s.rate, s.is_military, s.service_years)
+        const limit = WORKLOAD_CHART_NORM
         const pct = Math.min(Math.round((used / limit) * 100), 100)
         const isOver = used > limit
         const isWarn = pct > 80 && !isOver
