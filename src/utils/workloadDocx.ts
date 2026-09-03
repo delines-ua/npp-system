@@ -2,10 +2,10 @@ import {
     Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
     HeadingLevel, AlignmentType, WidthType, BorderStyle, PageBreak,
 } from 'docx'
-import type { Discipline, Staff, DetailedAssignment, DisciplineGroupFull } from '../types/database'
+import type { Discipline, Staff, DetailedAssignment, DisciplineGroupFull, ScientificWork } from '../types/database'
 import type { WorkloadSettings } from './settings'
 import { getApplicableSlots, getTeachingLoadLimit } from './workload'
-import { WORKLOAD_TYPE_META, POSITIONS } from './lawNorms'
+import { WORKLOAD_TYPE_META, POSITIONS, SCIENTIFIC_WORK_META, isTeachingWorkType, THESIS_SEMESTER } from './lawNorms'
 
 // ─── Модель звіту ─────────────────────────────────────────────────────────────
 
@@ -52,6 +52,7 @@ export const buildWorkloadReportModel = (
     assignments: DetailedAssignment[],
     discGroupsByDisc: Map<string, DisciplineGroupFull[]>,
     settings?: WorkloadSettings,
+    scientificWorks: ScientificWork[] = [],
 ): ReportTeacher[] => {
     const discById = new Map(disciplines.map(d => [d.id, d]))
     const staffById = new Map(staff.map(s => [s.id, s]))
@@ -84,10 +85,23 @@ export const buildWorkloadReportModel = (
         byStaff.set(a.staff_id, arr)
     }
 
+    // Керівництво дипломними роботами (бакалавр/магістр) — це навчальне
+    // навантаження (Наказ №155/291, Табл.3), тож включаємо його у звіт нарівні
+    // з дисциплінами, а не лише в окремий планувальник атестацій.
+    const byStaffWorks = new Map<string, ScientificWork[]>()
+    for (const w of scientificWorks) {
+        if (!isTeachingWorkType(w.work_type) || !staffById.has(w.staff_id)) continue
+        const arr = byStaffWorks.get(w.staff_id) ?? []
+        arr.push(w)
+        byStaffWorks.set(w.staff_id, arr)
+    }
+
+    const staffIds = new Set<string>([...byStaff.keys(), ...byStaffWorks.keys()])
     const teachers: ReportTeacher[] = []
 
-    for (const [staffId, staffAssigns] of byStaff) {
+    for (const staffId of staffIds) {
         const s = staffById.get(staffId)!
+        const staffAssigns = byStaff.get(staffId) ?? []
 
         const byDisc = new Map<string, DetailedAssignment[]>()
         for (const a of staffAssigns) {
@@ -133,6 +147,37 @@ export const buildWorkloadReportModel = (
 
         // Дисципліни: за семестром, потім за назвою
         disciplinesModel.sort((a, b) => a.semester - b.semester || a.name.localeCompare(b.name, 'uk'))
+
+        // Керівництво дипломними роботами — окремими рядками в кінці списку
+        // (по одному на тип: бакалаврська/магістерська), з обраним для захисту
+        // семестром навчального року.
+        const worksForStaff = byStaffWorks.get(staffId) ?? []
+        const worksByType = new Map<string, ScientificWork[]>()
+        for (const w of worksForStaff) {
+            const arr = worksByType.get(w.work_type) ?? []
+            arr.push(w)
+            worksByType.set(w.work_type, arr)
+        }
+        for (const [type, works] of worksByType) {
+            const meta = SCIENTIFIC_WORK_META[type as keyof typeof SCIENTIFIC_WORK_META]
+            const totalCount = works.reduce((sum, w) => sum + w.student_count, 0)
+            const totalHours = Math.round(works.reduce((sum, w) => sum + w.hours, 0) * 100) / 100
+            const semester = THESIS_SEMESTER[type as keyof typeof THESIS_SEMESTER] ?? 0
+            if (semester === 1) sem1 += totalHours
+            else if (semester === 2) sem2 += totalHours
+
+            disciplinesModel.push({
+                name: meta.label,
+                semester,
+                level: '',
+                rows: [{
+                    typeLabel: 'Керівництво',
+                    groupLabel: `${totalCount} ${totalCount === 1 ? 'особа' : 'осіб'}`,
+                    hours: totalHours,
+                }],
+                subtotal: totalHours,
+            })
+        }
 
         sem1 = Math.round(sem1 * 100) / 100
         sem2 = Math.round(sem2 * 100) / 100
@@ -336,12 +381,15 @@ export const buildWorkloadDoc = (
         }
 
         t.disciplines.forEach(disc => {
+            const suffix = disc.semester > 0
+                ? (disc.level ? `   (семестр ${disc.semester} · ${disc.level})` : `   (семестр ${disc.semester})`)
+                : ''
             teacherSections.push(new Paragraph({
                 spacing: { before: 120, after: 60 },
                 children: [
                     txt('▸ ', { bold: true, size: 24 }),
                     txt(disc.name, { bold: true, size: 24 }),
-                    txt(`   (семестр ${disc.semester} · ${disc.level})`, { size: 20, color: '666666' }),
+                    ...(suffix ? [txt(suffix, { size: 20, color: '666666' })] : []),
                 ],
             }))
             teacherSections.push(buildDisciplineTable(disc))
@@ -358,8 +406,8 @@ export const buildWorkloadDoc = (
         spacing: { before: 240 },
         border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC', space: 6 } },
         children: [
-            txt('Звіт відображає розподілене аудиторне навантаження (лекції, ГЗ, ПЗ, курсові/контрольні роботи, іспити, заліки). ', { italics: true, size: 18, color: '666666' }),
-            txt('Години консультацій нараховуються на рівні дисципліни й не розподіляються поіменно; атестаційні (дипломні) роботи та наукова робота у цей звіт не входять.', { italics: true, size: 18, color: '666666' }),
+            txt('Звіт відображає розподілене аудиторне навантаження (лекції, ГЗ, ПЗ, курсові/контрольні роботи, іспити, заліки) та керівництво дипломними роботами (бакалавр/магістр). ', { italics: true, size: 18, color: '666666' }),
+            txt('Години консультацій нараховуються на рівні дисципліни й не розподіляються поіменно; наукова робота (керівництво ад’юнктами/докторантами) у цей звіт не входить.', { italics: true, size: 18, color: '666666' }),
         ],
     })
 

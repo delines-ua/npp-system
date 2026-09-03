@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { InstituteGroup, DisciplineGroupFull, Discipline } from '../types/database'
+import type { InstituteGroup, DisciplineGroupFull, Discipline, DetailedAssignment } from '../types/database'
 import { getApplicableSlots } from '../utils/workload'
 
 export const getInstituteGroups = async (): Promise<InstituteGroup[]> => {
@@ -246,11 +246,35 @@ export const recalcDisciplineAssignmentHours = async (disciplineId: string): Pro
     // Рахуємо лише слоти, де змінились ГОДИНИ (курсові/контрольні/іспити/заліки) —
     // саме це впливає на навантаження. Поле student_count синхронізуємо завжди,
     // але метадані-без-зміни-годин (лекції/ГЗ/ПЗ) у лічильник не потрапляють.
+    const bySlotKey = new Map<string, DetailedAssignment[]>()
+    for (const a of assigns as DetailedAssignment[]) {
+        const key = `${a.workload_type}|${a.group_number}`
+        const arr = bySlotKey.get(key) ?? []
+        arr.push(a)
+        bySlotKey.set(key, arr)
+    }
+
     let updated = 0
     const updates: Promise<void>[] = []
-    for (const a of assigns) {
-        const slot = slotMap.get(`${a.workload_type}|${a.group_number}`)
-        if (!slot) continue   // напр. атестаційні роботи — окремий планувальник
+    const orphanIds: string[] = []
+    for (const [key, rows] of bySlotKey) {
+        const slot = slotMap.get(key)
+        if (!slot) {
+            // Атестаційні дисципліни (is_thesis) мають окремий планувальник, що не
+            // будує слоти через getApplicableSlots — там неспівпадіння очікуване й
+            // навмисне, не чіпаємо. Для звичайних дисциплін неспівпадіння означає
+            // «осиротілий» рядок, що лишився після зміни складу груп (напр.
+            // переприв'язки «Авто» чи видалення групи, яке зсунуло нумерацію
+            // решти слотів) — прибираємо його, інакше він і далі накручує години
+            // викладачу та занижує % заповненості дисципліни.
+            if (!disc.is_thesis) orphanIds.push(...rows.map(r => r.id))
+            continue
+        }
+        // Слот, поділений між кількома викладачами (напр. курсові — керівництво
+        // розбите на кількох НПП), не чіпаємо автоматично: як розподілити нове
+        // значення год/курсантів між рядками — неоднозначно, це ручне рішення.
+        if (rows.length > 1) continue
+        const a = rows[0]
         const hoursChanged = slot.hours !== a.hours
         if (hoursChanged || slot.studentCount !== a.student_count) {
             updates.push(
@@ -262,6 +286,12 @@ export const recalcDisciplineAssignmentHours = async (disciplineId: string): Pro
             )
             if (hoursChanged) updated++
         }
+    }
+    if (orphanIds.length > 0) {
+        updates.push(
+            supabase.from('workload_assignments').delete().in('id', orphanIds)
+                .then(({ error }) => { if (error) throw error })
+        )
     }
     await Promise.all(updates)   // незалежні оновлення рядків — виконуємо паралельно
     return updated
@@ -353,5 +383,10 @@ export const autoLinkGroupsBySpecialty = async (
     if (insErr) throw insErr
 
     await syncDisciplineStudentCount(disciplineId)
+    // Переприв'язка групами могла змінити їх кількість/порядок — слоти
+    // перенумеровуються позиційно (1..N), тож наявні призначення потребують
+    // пересинхронізації (і прибирання «осиротілих» рядків), як і при ручній
+    // зміні складу груп.
+    await recalcDisciplineAssignmentHours(disciplineId)
     return groups.length
 }

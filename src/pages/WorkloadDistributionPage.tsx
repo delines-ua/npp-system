@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDepartments } from '../services/departments'
 import { getStaff } from '../services/staff'
 import { getDisciplines } from '../services/disciplines'
+import { getScientificWorks } from '../services/scientificWorks'
 import {
     getDetailedAssignments,
     assignSlot,
@@ -120,6 +121,12 @@ export default function WorkloadDistributionPage() {
         queryKey: ['detailed-assignments', selectedDept, ACADEMIC_YEAR, discIds.join(',')],
         queryFn: () => getDetailedAssignments(discIds),
         enabled: !!selectedDept && discIds.length > 0,
+    })
+
+    const { data: scientificWorks = [] } = useQuery({
+        queryKey: ['scientific-works', selectedDept, ACADEMIC_YEAR],
+        queryFn: () => getScientificWorks(selectedDept, ACADEMIC_YEAR),
+        enabled: !!selectedDept,
     })
 
     const { data: allGroups = [] } = useQuery({
@@ -334,8 +341,9 @@ export default function WorkloadDistributionPage() {
     const courseWorkHoursPerStudent = selectedDisc ? getCourseWorkHoursPerStudent(selectedDisc) : 0
 
     // ── Експорт звіту (.docx) ───────────────────────────────────────────────────
+    const hasReportData = assignments.length > 0 || scientificWorks.length > 0
     const handleExportReport = async () => {
-        if (!selectedDept || assignments.length === 0 || exporting) return
+        if (!selectedDept || !hasReportData || exporting) return
         const dept = departments?.find(d => d.id === selectedDept)
         if (!dept) return
         setExporting(true)
@@ -343,7 +351,7 @@ export default function WorkloadDistributionPage() {
             // discGroupsByDisc (прив'язки груп по всіх дисциплінах кафедри) вже
             // завантажені й підтримуються актуальними реактивним useQuery вище —
             // реальні назви груп у звіті без додаткового запиту.
-            const model = buildWorkloadReportModel(staff, disciplines, assignments, discGroupsByDisc, settings)
+            const model = buildWorkloadReportModel(staff, disciplines, assignments, discGroupsByDisc, settings, scientificWorks)
             if (model.length === 0) {
                 alert('Немає розподіленого навантаження для формування звіту.')
                 return
@@ -374,17 +382,17 @@ export default function WorkloadDistributionPage() {
                     {selectedDept && (
                         <button
                             onClick={handleExportReport}
-                            disabled={assignments.length === 0 || exporting}
-                            title={assignments.length === 0 ? 'Немає розподіленого навантаження' : 'Завантажити звіт (.docx)'}
+                            disabled={!hasReportData || exporting}
+                            title={!hasReportData ? 'Немає розподіленого навантаження' : 'Завантажити звіт (.docx)'}
                             style={{
                                 padding: '10px 16px',
-                                background: assignments.length === 0 ? '#f9fafb' : '#eff6ff',
-                                border: `1px solid ${assignments.length === 0 ? '#e5e7eb' : '#bfdbfe'}`,
+                                background: !hasReportData ? '#f9fafb' : '#eff6ff',
+                                border: `1px solid ${!hasReportData ? '#e5e7eb' : '#bfdbfe'}`,
                                 borderRadius: '8px',
-                                cursor: assignments.length === 0 || exporting ? 'not-allowed' : 'pointer',
+                                cursor: !hasReportData || exporting ? 'not-allowed' : 'pointer',
                                 fontSize: '14px', fontWeight: '500',
                                 display: 'flex', alignItems: 'center', gap: '8px',
-                                color: assignments.length === 0 ? '#9ca3af' : '#2563eb',
+                                color: !hasReportData ? '#9ca3af' : '#2563eb',
                                 whiteSpace: 'nowrap',
                                 opacity: exporting ? 0.7 : 1,
                             }}

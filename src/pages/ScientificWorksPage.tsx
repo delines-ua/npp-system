@@ -2,14 +2,15 @@ import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDepartments } from '../services/departments'
 import { getStaff } from '../services/staff'
-import { getScientificWorks, createScientificWork, deleteScientificWork } from '../services/scientificWorks'
+import { getScientificWorks, createScientificWork, updateScientificWork, deleteScientificWork } from '../services/scientificWorks'
 import { getDetailedAssignments } from '../services/workloadAssignments'
 import { getDisciplines } from '../services/disciplines'
+import { getDisciplineGroupsForDisciplines } from '../services/instituteGroups'
 import { getWorkloadCeiling, buildStaffHoursMap } from '../utils/workload'
 import { useSettings } from '../contexts/SettingsContext'
 import { getScientificWorkTypes } from '../utils/lawNorms'
 import type { ScientificWorkType } from '../utils/lawNorms'
-import { GraduationCap, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { GraduationCap, Plus, Trash2, AlertTriangle, Users } from 'lucide-react'
 import Select from '../components/Select'
 
 const card: React.CSSProperties = {
@@ -66,14 +67,31 @@ export default function ScientificWorksPage() {
         enabled: !!selectedDept,
     })
 
+    const { data: disciplineGroups = [] } = useQuery({
+        queryKey: ['discipline-groups-for-scientific-works', selectedDept, ACADEMIC_YEAR, discIds.join(',')],
+        queryFn: () => getDisciplineGroupsForDisciplines(discIds),
+        enabled: !!selectedDept && discIds.length > 0,
+    })
+
     const inv = () => queryClient.invalidateQueries({ queryKey: ['scientific-works', selectedDept, ACADEMIC_YEAR] })
 
+    // Кілька призначень одного типу (бакалавр/магістр/ад'юнкт) одному й тому ж
+    // НПП об'єднуємо в один рядок (сумуємо осіб і години), а не плодимо дублікати —
+    // так на екрані завжди максимум один рядок на тип роботи на викладача.
     const createMutation = useMutation({
-        mutationFn: () => createScientificWork(
-            addForm.staffId, selectedDept, addForm.type,
-            Number(addForm.count), addForm.notes, ACADEMIC_YEAR,
-            scientificWorkTypes[addForm.type].hours
-        ),
+        mutationFn: () => {
+            const hoursPerStudent = scientificWorkTypes[addForm.type].hours
+            const count = Number(addForm.count)
+            const existing = works.find(w => w.staff_id === addForm.staffId && w.work_type === addForm.type)
+            if (existing) {
+                const mergedNotes = [existing.notes, addForm.notes].filter(Boolean).join('; ')
+                return updateScientificWork(existing.id, existing.student_count + count, mergedNotes, hoursPerStudent)
+            }
+            return createScientificWork(
+                addForm.staffId, selectedDept, addForm.type,
+                count, addForm.notes, ACADEMIC_YEAR, hoursPerStudent
+            )
+        },
         onSuccess: () => {
             inv()
             setAddForm(f => ({ ...f, staffId: '', count: '', notes: '' }))
@@ -107,6 +125,28 @@ export default function ScientificWorksPage() {
 
     const workTypeKeys = Object.keys(scientificWorkTypes) as ScientificWorkType[]
 
+    // Пул здобувачів кафедри: беремо групи, прив'язані до дисциплін кафедри,
+    // і серед бакалаврських/магістерських груп — найстарший курс (найближчий
+    // до захисту), щоб не сумувати молодші курси, які ще не пишуть роботи.
+    const { bachelorPool, masterPool } = useMemo(() => {
+        const uniqueGroups = new Map<string, { course: number; is_masters: boolean; student_count: number }>()
+        for (const dg of disciplineGroups) {
+            if (dg.group) uniqueGroups.set(dg.group_id, dg.group)
+        }
+        const groups = [...uniqueGroups.values()]
+        const bachelorGroups = groups.filter(g => !g.is_masters)
+        const masterGroups = groups.filter(g => g.is_masters)
+        const maxBachelorCourse = bachelorGroups.reduce((m, g) => Math.max(m, g.course), 0)
+        const maxMasterCourse = masterGroups.reduce((m, g) => Math.max(m, g.course), 0)
+        return {
+            bachelorPool: bachelorGroups.filter(g => g.course === maxBachelorCourse).reduce((s, g) => s + g.student_count, 0),
+            masterPool: masterGroups.filter(g => g.course === maxMasterCourse).reduce((s, g) => s + g.student_count, 0),
+        }
+    }, [disciplineGroups])
+
+    const assignedBachelor = works.filter(w => w.work_type === 'bachelor_thesis').reduce((s, w) => s + w.student_count, 0)
+    const assignedMaster = works.filter(w => w.work_type === 'master_thesis').reduce((s, w) => s + w.student_count, 0)
+
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
@@ -137,13 +177,44 @@ export default function ScientificWorksPage() {
             )}
 
             {selectedDept && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    {([
+                        { label: 'Бакалаври (випускний курс)', pool: bachelorPool, assigned: assignedBachelor, color: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe' },
+                        { label: 'Магістри (випускний курс)', pool: masterPool, assigned: assignedMaster, color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' },
+                    ] as const).map(row => {
+                        const remaining = Math.max(row.pool - row.assigned, 0)
+                        const pct = row.pool > 0 ? Math.min(Math.round((row.assigned / row.pool) * 100), 100) : 0
+                        return (
+                            <div key={row.label} style={{ ...card, padding: '14px 20px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', color: '#374151' }}>
+                                        <Users size={14} color={row.color} />
+                                        {row.label}
+                                    </div>
+                                    <div style={{ fontSize: '14px', fontWeight: '700', color: row.color }}>
+                                        {row.assigned} / {row.pool} осіб
+                                    </div>
+                                </div>
+                                <div style={{ width: '100%', height: '5px', background: row.bg, border: `1px solid ${row.border}`, borderRadius: '3px', marginTop: '8px', overflow: 'hidden' }}>
+                                    <div style={{ height: '100%', width: `${pct}%`, background: row.color, borderRadius: '3px', transition: 'width 0.3s' }} />
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '5px' }}>
+                                    {row.pool === 0 ? 'Немає прив’язаних груп випускного курсу' : `Без керівника: ${remaining} осіб`}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {selectedDept && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '16px', alignItems: 'start' }}>
 
                     {/* LEFT: Staff workload + their works */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                         {staff.map(s => {
                             const limit = getWorkloadCeiling(s, settings)
-                            const used  = Math.round(staffHoursMap[s.id] || 0)
+                            const used  = staffHoursMap[s.id] || 0
                             const pct   = Math.min(Math.round((used / limit) * 100), 100)
                             const isOver = used > limit
                             const isWarn = pct > 80 && !isOver
