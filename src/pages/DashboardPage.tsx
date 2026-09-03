@@ -207,7 +207,7 @@ export default function DashboardPage() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
                             {/* Legend */}
-                            <div style={{ display: 'flex', gap: '16px', marginBottom: '6px', paddingLeft: '120px' }}>
+                            <div style={{ display: 'flex', gap: '16px', marginBottom: '6px', paddingLeft: '210px' }}>
                                 {[['#22c55e', 'Норма'], ['#f59e0b', '>80%'], ['#ef4444', 'Перевищено']].map(([c, l]) => (
                                     <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                         <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: c }} />
@@ -216,7 +216,7 @@ export default function DashboardPage() {
                                 ))}
                             </div>
                             {staffChartData.map(s => (
-                                <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '116px 1fr 64px', alignItems: 'center', gap: '10px' }}>
+                                <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '200px 1fr 64px', alignItems: 'center', gap: '10px' }}>
                                     <div
                                         onClick={() => navigate(`/staff?staff=${s.id}`)}
                                         title={`Відкрити картку · ${s.name}`}
