@@ -9,6 +9,7 @@ import {
     assignSlot,
     clearSlot,
     deleteDetailedAssignment,
+    assignCourseWorkSplit,
 } from '../services/workloadAssignments'
 import {
     getInstituteGroups,
@@ -21,11 +22,14 @@ import {
 import {
     getApplicableSlots,
     getDisciplineStatus,
+    getSlotFillCounts,
+    getCourseWorkHoursPerStudent,
 } from '../utils/workload'
 import { buildWorkloadReportModel, exportWorkloadDocx } from '../utils/workloadDocx'
-import type { Discipline, Staff, WorkloadTypeKey, DisciplineGroupFull } from '../types/database'
+import type { Discipline, Staff, WorkloadTypeKey, DisciplineGroupFull, DetailedAssignment } from '../types/database'
 import { Layers, Search, UserCheck, Users, Plus, X, ChevronDown, ExternalLink, FileDown } from 'lucide-react'
 import Select from '../components/Select'
+import NumberInput from '../components/NumberInput'
 import { useSettings } from '../contexts/SettingsContext'
 
 const card = {
@@ -129,6 +133,24 @@ export default function WorkloadDistributionPage() {
         enabled: !!selectedDiscId,
     })
 
+    // Прив'язки груп одразу для всіх дисциплін кафедри — потрібні, щоб статус
+    // заповненості слотів у списку зліва рахувався по РЕАЛЬНІЙ к-сті курсантів
+    // групи (231:32, 232:32, 233:29...), а не по рівномірному fallback-поділу.
+    const { data: allDiscGroups = [] } = useQuery({
+        queryKey: ['discipline-groups-bulk', selectedDept, ACADEMIC_YEAR, discIds.join(',')],
+        queryFn: () => getDisciplineGroupsForDisciplines(discIds),
+        enabled: !!selectedDept && discIds.length > 0,
+    })
+    const discGroupsByDisc = useMemo(() => {
+        const map = new Map<string, DisciplineGroupFull[]>()
+        for (const dg of allDiscGroups) {
+            const arr = map.get(dg.discipline_id) ?? []
+            arr.push(dg)
+            map.set(dg.discipline_id, arr)
+        }
+        return map
+    }, [allDiscGroups])
+
     // ── Mutations ─────────────────────────────────────────────────────────────
     const invalidateAssignments = () =>
         queryClient.invalidateQueries({ queryKey: ['detailed-assignments', selectedDept] })
@@ -152,13 +174,32 @@ export default function WorkloadDistributionPage() {
         onSuccess: invalidateAssignments,
     })
 
-    // Призначити обраного викладача на ВСІ слоти дисципліни (крім тих, що вже його)
+    // Часткове призначення курсових: частина курсантів групи → один НПП,
+    // решта лишається доступною для інших (на відміну від assignMutation
+    // не витісняє призначення інших викладачів для того самого слоту).
+    const assignCourseWorkMutation = useMutation({
+        mutationFn: ({
+            discId, staffId, groupNumber, studentCount, hoursPerStudent,
+        }: { discId: string; staffId: string; groupNumber: number; studentCount: number; hoursPerStudent: number }) =>
+            assignCourseWorkSplit(discId, staffId, groupNumber, studentCount, hoursPerStudent, ACADEMIC_YEAR),
+        onSuccess: invalidateAssignments,
+    })
+
+    // Призначити обраного викладача на ВСІ слоти дисципліни (крім тих, що вже повністю його —
+    // включно зі слотами курсових, розподіленими на кілька НПП: "все" означає одноосібно
+    // забрати весь слот собі, тож перевіряємо повне покриття, а не перший знайдений рядок)
     const assignAllMutation = useMutation({
         mutationFn: async () => {
             if (!selectedStaffId || !selectedDisc) return
             for (const slot of slots) {
-                const existing = getSlotAssignment(slot.type, slot.groupNumber)
-                if (existing?.staff_id === selectedStaffId) continue
+                const rows = assignments.filter(a =>
+                    a.discipline_id === selectedDisc.id &&
+                    a.workload_type === slot.type &&
+                    a.group_number === slot.groupNumber
+                )
+                const fullyMine = rows.length === 1 && rows[0].staff_id === selectedStaffId &&
+                    rows[0].student_count >= slot.studentCount
+                if (fullyMine) continue
                 await assignSlot(
                     selectedDisc.id, selectedStaffId, slot.type, slot.groupNumber,
                     slot.hours, slot.studentCount, ACADEMIC_YEAR,
@@ -234,13 +275,13 @@ export default function WorkloadDistributionPage() {
         let none = 0, partial = 0, full = 0, thesis = 0
         for (const d of disciplines) {
             if (d.is_thesis) { thesis++; continue }
-            const s = getDisciplineStatus(d, assignments)
+            const s = getDisciplineStatus(d, assignments, discGroupsByDisc.get(d.id))
             if (s === 'none') none++
             else if (s === 'partial') partial++
             else full++
         }
         return { none, partial, full, thesis }
-    }, [disciplines, assignments])
+    }, [disciplines, assignments, discGroupsByDisc])
 
     const getSlotAssignment = (type: WorkloadTypeKey, groupNumber: number) =>
         assignments.find(
@@ -290,6 +331,7 @@ export default function WorkloadDistributionPage() {
 
     // Слоти для обраної дисципліни
     const slots = selectedDisc ? getApplicableSlots(selectedDisc, disciplineGroups.length > 0 ? disciplineGroups : undefined) : []
+    const courseWorkHoursPerStudent = selectedDisc ? getCourseWorkHoursPerStudent(selectedDisc) : 0
 
     // ── Експорт звіту (.docx) ───────────────────────────────────────────────────
     const handleExportReport = async () => {
@@ -298,17 +340,9 @@ export default function WorkloadDistributionPage() {
         if (!dept) return
         setExporting(true)
         try {
-            // Прив'язки груп одразу для всіх дисциплін кафедри (реальні назви груп у звіті)
-            const allDiscGroups = await queryClient.fetchQuery({
-                queryKey: ['discipline-groups-bulk', selectedDept, ACADEMIC_YEAR, discIds.join(',')],
-                queryFn: () => getDisciplineGroupsForDisciplines(discIds),
-            })
-            const discGroupsByDisc = new Map<string, DisciplineGroupFull[]>()
-            for (const dg of allDiscGroups) {
-                const arr = discGroupsByDisc.get(dg.discipline_id) ?? []
-                arr.push(dg)
-                discGroupsByDisc.set(dg.discipline_id, arr)
-            }
+            // discGroupsByDisc (прив'язки груп по всіх дисциплінах кафедри) вже
+            // завантажені й підтримуються актуальними реактивним useQuery вище —
+            // реальні назви груп у звіті без додаткового запиту.
             const model = buildWorkloadReportModel(staff, disciplines, assignments, discGroupsByDisc, settings)
             if (model.length === 0) {
                 alert('Немає розподіленого навантаження для формування звіту.')
@@ -458,12 +492,7 @@ export default function WorkloadDistributionPage() {
                                     )
                                 }
 
-                                const slots = getApplicableSlots(disc)
-                                const discAssignments = assignments.filter(a => a.discipline_id === disc.id)
-                                const filled = slots.filter(s =>
-                                    discAssignments.some(a => a.workload_type === s.type && a.group_number === s.groupNumber)
-                                ).length
-                                const total = slots.length
+                                const { filled, total } = getSlotFillCounts(disc, assignments, discGroupsByDisc.get(disc.id))
                                 const pct = total > 0 ? Math.round((filled / total) * 100) : 100
                                 const barColor = pct === 100 ? '#22c55e' : pct > 50 ? '#eab308' : pct > 25 ? '#f97316' : '#ef4444'
                                 return (
@@ -957,7 +986,29 @@ export default function WorkloadDistributionPage() {
                                                             </span>
                                                         </div>
                                                         {/* Slot rows */}
-                                                        {typeSlots.map((slot, idx) => {
+                                                        {type === 'course_work' ? typeSlots.map((slot, idx) => {
+                                                            const rows = assignments.filter(a =>
+                                                                a.discipline_id === selectedDisc.id &&
+                                                                a.workload_type === 'course_work' &&
+                                                                a.group_number === slot.groupNumber
+                                                            )
+                                                            return (
+                                                                <CourseWorkGroupCard
+                                                                    key={`${slot.type}-${slot.groupNumber}`}
+                                                                    slot={slot}
+                                                                    rows={rows}
+                                                                    staff={staff}
+                                                                    selectedStaffId={selectedStaffId}
+                                                                    isLast={idx === typeSlots.length - 1}
+                                                                    busy={assignCourseWorkMutation.isPending || deleteMutation.isPending}
+                                                                    onAssign={(staffId, count) => assignCourseWorkMutation.mutate({
+                                                                        discId: selectedDisc.id, staffId, groupNumber: slot.groupNumber,
+                                                                        studentCount: count, hoursPerStudent: courseWorkHoursPerStudent,
+                                                                    })}
+                                                                    onRemove={id => deleteMutation.mutate(id)}
+                                                                />
+                                                            )
+                                                        }) : typeSlots.map((slot, idx) => {
                                                             const assignment = getSlotAssignment(slot.type, slot.groupNumber)
                                                             const isMySlot = assignment?.staff_id === selectedStaffId
                                                             const ownerName = assignment
@@ -1071,6 +1122,131 @@ export default function WorkloadDistributionPage() {
                     )}
                 </div>
             )}
+        </div>
+    )
+}
+
+// ── Слот курсових робіт: розподіл групи на кількох НПП ────────────────────────
+// На відміну від інших типів занять (1 слот = 1 викладач), курсанти однієї групи
+// можуть бути поділені між кількома викладачами (напр. 23 → 10/8/5).
+type CourseWorkSlot = { groupNumber: number; label: string; groupLabel: string; hours: number; studentCount: number }
+
+function CourseWorkGroupCard({
+    slot, rows, staff, selectedStaffId, isLast, busy, onAssign, onRemove,
+}: {
+    slot: CourseWorkSlot
+    rows: DetailedAssignment[]
+    staff: Staff[]
+    selectedStaffId: string | null
+    isLast: boolean
+    busy: boolean
+    onAssign: (staffId: string, count: number) => void
+    onRemove: (id: string) => void
+}) {
+    const typeColor = '#f97316'
+    const assignedStudents = rows.reduce((s, r) => s + (r.student_count || 0), 0)
+    const remaining = Math.max(slot.studentCount - assignedStudents, 0)
+    const mine = selectedStaffId ? rows.find(r => r.staff_id === selectedStaffId) : undefined
+    const maxForSelected = remaining + (mine?.student_count || 0)
+    const isFull = remaining === 0
+
+    const [count, setCount] = useState(mine?.student_count || Math.min(remaining, slot.studentCount) || 1)
+    useEffect(() => {
+        setCount(mine?.student_count || Math.min(Math.max(remaining, 1), slot.studentCount))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedStaffId, slot.groupNumber, mine?.student_count])
+
+    return (
+        <div style={{ borderBottom: isLast ? 'none' : `1px solid ${typeColor}15` }}>
+            {/* Group header */}
+            <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', background: `${typeColor}04`,
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '3px', height: '28px', borderRadius: '2px', background: typeColor, flexShrink: 0 }} />
+                    <div>
+                        <div style={{ fontSize: '13px', color: '#374151', fontWeight: '500' }}>
+                            {slot.groupLabel} <span style={{ color: '#9ca3af' }}>· {slot.studentCount} ос.</span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: typeColor, fontWeight: '600', marginTop: '1px' }}>{slot.hours} год всього</div>
+                    </div>
+                </div>
+                <span style={{
+                    fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', whiteSpace: 'nowrap',
+                    color: isFull ? '#16a34a' : assignedStudents > 0 ? '#d97706' : '#9ca3af',
+                    background: isFull ? '#f0fdf4' : assignedStudents > 0 ? '#fffbeb' : '#f9fafb',
+                    border: `1px solid ${isFull ? '#bbf7d0' : assignedStudents > 0 ? '#fde68a' : '#e5e7eb'}`,
+                }}>
+                    {isFull ? '✓ Розподілено' : `Залишилось: ${remaining} ос.`}
+                </span>
+            </div>
+
+            {/* Existing splits */}
+            {rows.length > 0 && (
+                <div style={{ padding: '6px 14px 6px 30px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {rows.map(r => {
+                        const name = staff.find(s => s.id === r.staff_id)?.full_name ?? '—'
+                        const isMe = r.staff_id === selectedStaffId
+                        return (
+                            <div key={r.id} style={{
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                padding: '6px 10px', background: isMe ? '#f0fdf4' : '#fff',
+                                border: `1px solid ${isMe ? '#bbf7d0' : '#f3f4f6'}`, borderRadius: '7px',
+                            }}>
+                                <span style={{ fontSize: '12px', color: '#374151', fontWeight: 500, flex: 1 }}>
+                                    {name.split(' ')[0]} {name.split(' ')[1]?.[0] ?? ''}.
+                                </span>
+                                <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                                    {r.student_count} ос. · <b style={{ color: typeColor }}>{r.hours} год</b>
+                                </span>
+                                <button
+                                    disabled={busy}
+                                    onClick={() => onRemove(r.id)}
+                                    title="Зняти призначення"
+                                    style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: busy ? 'default' : 'pointer', padding: '2px', display: 'flex' }}
+                                >
+                                    <X size={13} />
+                                </button>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* Assign a chunk to the currently selected teacher */}
+            <div style={{ padding: '6px 14px 10px 30px' }}>
+                {!selectedStaffId ? (
+                    <div style={{ fontSize: '11px', color: '#d1d5db' }}>Оберіть викладача вище, щоб призначити частину групи</div>
+                ) : maxForSelected === 0 ? (
+                    <div style={{ fontSize: '11px', color: '#9ca3af' }}>Група повністю розподілена</div>
+                ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <NumberInput
+                            min={1} max={maxForSelected}
+                            value={count}
+                            onChange={v => setCount(Math.max(1, Math.min(v, maxForSelected)))}
+                            style={{
+                                width: '56px', padding: '5px 8px', border: '1px solid #d1d5db',
+                                borderRadius: '6px', fontSize: '12px', color: '#111827', outline: 'none',
+                            }}
+                        />
+                        <span style={{ fontSize: '11px', color: '#9ca3af' }}>з {maxForSelected} ос.</span>
+                        <button
+                            disabled={busy || count < 1 || count > maxForSelected}
+                            onClick={() => onAssign(selectedStaffId, count)}
+                            style={{
+                                marginLeft: 'auto', padding: '5px 12px', borderRadius: '6px',
+                                border: '1px solid #fed7aa', background: '#fff7ed', color: '#f97316',
+                                fontSize: '12px', fontWeight: '600', cursor: busy ? 'default' : 'pointer',
+                                opacity: busy ? 0.6 : 1,
+                            }}
+                        >
+                            {mine ? '↻ Оновити' : '+ Призначити'}
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }

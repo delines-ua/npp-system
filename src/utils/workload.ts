@@ -271,21 +271,43 @@ export const getApplicableSlots = (disc: Discipline, discGroups?: DisciplineGrou
     return slots
 }
 
+// Норма годин на 1 курсанта для курсової роботи по дисципліні (к-сть робіт × 6 год) —
+// використовується при розподілі курсових по частинах групи між кількома НПП.
+export const getCourseWorkHoursPerStudent = (disc: Discipline): number =>
+    Math.round(disc.course_works * TIME_NORMS.courseWork.hoursPerWork * 100) / 100
+
 export type DisciplineStatus = 'none' | 'partial' | 'full'
+
+// Кількість слотів, повністю покритих призначеннями (сума student_count по слоту
+// дорівнює місткості слоту). Слот з курсовими може мати кілька рядків-призначень
+// (розподіл групи між НПП), тож "заповнено" означає покриття ВСІХ курсантів,
+// а не просто наявність хоч одного призначення.
+export const getSlotFillCounts = (
+    disc: Discipline,
+    assignments: DetailedAssignment[],
+    discGroups?: DisciplineGroupFull[]
+): { filled: number; total: number } => {
+    const slots = getApplicableSlots(disc, discGroups)
+    if (slots.length === 0) return { filled: 0, total: 0 }
+    const discAssignments = assignments.filter(a => a.discipline_id === disc.id)
+    const filled = slots.filter(slot => {
+        const rows = discAssignments.filter(a => a.workload_type === slot.type && a.group_number === slot.groupNumber)
+        if (rows.length === 0) return false
+        const assignedStudents = rows.reduce((s, a) => s + (a.student_count || 0), 0)
+        return assignedStudents >= slot.studentCount
+    }).length
+    return { filled, total: slots.length }
+}
 
 export const getDisciplineStatus = (
     disc: Discipline,
-    assignments: DetailedAssignment[]
+    assignments: DetailedAssignment[],
+    discGroups?: DisciplineGroupFull[]
 ): DisciplineStatus => {
-    const slots = getApplicableSlots(disc)
-    if (slots.length === 0) return 'full'
-    const discAssignments = assignments.filter(a => a.discipline_id === disc.id)
-    if (discAssignments.length === 0) return 'none'
-    const filled = slots.filter(slot =>
-        discAssignments.some(a => a.workload_type === slot.type && a.group_number === slot.groupNumber)
-    ).length
+    const { filled, total } = getSlotFillCounts(disc, assignments, discGroups)
+    if (total === 0) return 'full'
     if (filled === 0) return 'none'
-    if (filled >= slots.length) return 'full'
+    if (filled >= total) return 'full'
     return 'partial'
 }
 

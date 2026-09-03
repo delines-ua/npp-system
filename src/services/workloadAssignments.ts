@@ -43,6 +43,51 @@ export const assignSlot = async (
     if (error) throw error
 }
 
+// Часткове призначення курсових робіт: курсанти однієї групи можуть бути розподілені
+// між кількома НПП (напр. 23 курсанти → 10/8/5). На відміну від assignSlot, НЕ видаляє
+// призначення інших НПП для цього слоту — лише додає або оновлює власний запис виконавця.
+export const assignCourseWorkSplit = async (
+    disciplineId: string,
+    staffId: string,
+    groupNumber: number,
+    studentCount: number,
+    hoursPerStudent: number,
+    academicYear: string = '2025-2026'
+): Promise<void> => {
+    const hours = Math.round(studentCount * hoursPerStudent * 10) / 10
+
+    const { data: existing, error: findError } = await supabase
+        .from('workload_assignments')
+        .select('id')
+        .eq('discipline_id', disciplineId)
+        .eq('staff_id', staffId)
+        .eq('workload_type', 'course_work')
+        .eq('group_number', groupNumber)
+        .maybeSingle()
+    if (findError) throw findError
+
+    if (existing) {
+        const { error } = await supabase
+            .from('workload_assignments')
+            .update({ hours, student_count: studentCount })
+            .eq('id', existing.id)
+        if (error) throw error
+    } else {
+        const { error } = await supabase
+            .from('workload_assignments')
+            .insert({
+                discipline_id: disciplineId,
+                staff_id: staffId,
+                workload_type: 'course_work',
+                group_number: groupNumber,
+                hours,
+                student_count: studentCount,
+                academic_year: academicYear,
+            })
+        if (error) throw error
+    }
+}
+
 export const clearSlot = async (
     disciplineId: string,
     workloadType: WorkloadTypeKey,
