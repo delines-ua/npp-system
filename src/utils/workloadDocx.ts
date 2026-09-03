@@ -148,9 +148,11 @@ export const buildWorkloadReportModel = (
         // Дисципліни: за семестром, потім за назвою
         disciplinesModel.sort((a, b) => a.semester - b.semester || a.name.localeCompare(b.name, 'uk'))
 
-        // Керівництво дипломними роботами — окремими рядками в кінці списку
-        // (по одному на тип: бакалаврська/магістерська), з обраним для захисту
-        // семестром навчального року.
+        // Керівництво дипломними роботами та ад'юнктами/докторантами — окремими
+        // рядками в кінці списку (по одному на тип), з обраним для захисту
+        // семестром навчального року. Ад'юнкт/докторант не прив'язаний до
+        // конкретного семестру захисту — його години діляться порівну між І та
+        // ІІ семестрами, а сам рядок показується без семестрової позначки.
         const worksForStaff = byStaffWorks.get(staffId) ?? []
         const worksByType = new Map<string, ScientificWork[]>()
         for (const w of worksForStaff) {
@@ -162,13 +164,14 @@ export const buildWorkloadReportModel = (
             const meta = SCIENTIFIC_WORK_META[type as keyof typeof SCIENTIFIC_WORK_META]
             const totalCount = works.reduce((sum, w) => sum + w.student_count, 0)
             const totalHours = Math.round(works.reduce((sum, w) => sum + w.hours, 0) * 100) / 100
-            const semester = THESIS_SEMESTER[type as keyof typeof THESIS_SEMESTER] ?? 0
+            const semester = THESIS_SEMESTER[type as keyof typeof THESIS_SEMESTER]
             if (semester === 1) sem1 += totalHours
             else if (semester === 2) sem2 += totalHours
+            else { sem1 += totalHours / 2; sem2 += totalHours / 2 }
 
             disciplinesModel.push({
                 name: meta.label,
-                semester,
+                semester: semester ?? 0,
                 level: '',
                 rows: [{
                     typeLabel: 'Керівництво',
@@ -406,8 +409,8 @@ export const buildWorkloadDoc = (
         spacing: { before: 240 },
         border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC', space: 6 } },
         children: [
-            txt('Звіт відображає розподілене аудиторне навантаження (лекції, ГЗ, ПЗ, курсові/контрольні роботи, іспити, заліки) та керівництво дипломними роботами (бакалавр/магістр). ', { italics: true, size: 18, color: '666666' }),
-            txt('Години консультацій нараховуються на рівні дисципліни й не розподіляються поіменно; наукова робота (керівництво ад’юнктами/докторантами) у цей звіт не входить.', { italics: true, size: 18, color: '666666' }),
+            txt('Звіт відображає розподілене аудиторне навантаження (лекції, ГЗ, ПЗ, курсові/контрольні роботи, іспити, заліки) та керівництво здобувачами (дипломні роботи бакалавра/магістра, ад’юнкти/докторанти). ', { italics: true, size: 18, color: '666666' }),
+            txt('Години консультацій нараховуються на рівні дисципліни й не розподіляються поіменно. Керівництво ад’юнктами/докторантами не прив’язане до семестру захисту — його години поділені порівну між І та ІІ семестрами.', { italics: true, size: 18, color: '666666' }),
         ],
     })
 

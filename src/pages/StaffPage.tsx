@@ -150,6 +150,7 @@ export default function StaffPage() {
             const sem = THESIS_SEMESTER[w.work_type]
             if (sem === 1) row.sem1 += w.hours
             else if (sem === 2) row.sem2 += w.hours
+            else { row.sem1 += w.hours / 2; row.sem2 += w.hours / 2 }   // ад'юнкт/докторант — порівну на рік
             row.total += w.hours
         }
         for (const k in map) {

@@ -107,17 +107,19 @@ export const SCIENTIFIC_WORK_META = {
 
 export type ScientificWorkType = keyof typeof SCIENTIFIC_WORK_META
 
-// Керівництво дипломними роботами (бакалавр/магістр) — це навчальне навантаження
-// (Наказ №155/291, Табл.3), не наукова робота. Науковим є лише керівництво
-// здобувачами наукового ступеня (ад'юнкт/докторант).
-export const TEACHING_SCIENTIFIC_WORK_TYPES: ScientificWorkType[] = ['bachelor_thesis', 'master_thesis']
+// Керівництво дипломними роботами (бакалавр/магістр) і здобувачами наукового
+// ступеня (ад'юнкт/докторант) — усе це навчальне навантаження (Наказ №155/291,
+// Табл.3), не наукова робота НПП.
+export const TEACHING_SCIENTIFIC_WORK_TYPES: ScientificWorkType[] = ['bachelor_thesis', 'master_thesis', 'graduate_mentoring']
 export const isTeachingWorkType = (type: ScientificWorkType): boolean =>
     TEACHING_SCIENTIFIC_WORK_TYPES.includes(type)
 
 // scientific_works-записи не прив'язані до дисципліни/семестру напряму — захист
 // відбувається у фіксований семестр навчального року: магістерські роботи — 1-й
-// семестр (осінь), бакалаврські — 2-й семестр (весна). Ад'юнкт/докторант — наукове
-// навантаження на весь рік, без прив'язки до семестру.
+// семестр (осінь), бакалаврські — 2-й семестр (весна). Ад'юнкт/докторант —
+// керівництво триває впродовж усього року, без фіксованого семестру захисту —
+// відсутність запису тут є сигналом ділити його години порівну між І та ІІ
+// семестрами (див. використання в StaffPage/workloadDocx).
 export const THESIS_SEMESTER: Partial<Record<ScientificWorkType, 1 | 2>> = {
     master_thesis: 1,
     bachelor_thesis: 2,
