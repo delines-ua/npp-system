@@ -5,10 +5,10 @@ import { getStaff, createStaff, updateStaff, deleteStaff } from '../services/sta
 import { getDepartments } from '../services/departments'
 import { getDisciplines } from '../services/disciplines'
 import { getAssignmentsByStaff, getAssignmentsByStaffIds } from '../services/workloadAssignments'
-import { getScientificWorksByStaff } from '../services/scientificWorks'
+import { getScientificWorksByStaff, getScientificWorks } from '../services/scientificWorks'
 import { getTeachingLoadLimit, getWorkloadCeiling } from '../utils/workload'
 import { useSettings } from '../contexts/SettingsContext'
-import { WORKLOAD_TYPE_META, getScientificWorkTypes, isTeachingWorkType } from '../utils/lawNorms'
+import { WORKLOAD_TYPE_META, getScientificWorkTypes, isTeachingWorkType, THESIS_SEMESTER } from '../utils/lawNorms'
 import NumberInput from '../components/NumberInput'
 import type { Staff } from '../types/database'
 import { Users, Plus, Trash2, X, Save, Shield, User, Edit2, BookOpen, ChevronUp, Gauge, Search, GraduationCap, ArrowLeft } from 'lucide-react'
@@ -111,17 +111,29 @@ export default function StaffPage() {
         enabled: staffIds.length > 0,
     })
 
+    const { data: deptWorks = [] } = useQuery({
+        queryKey: ['dept-scientific-works', selectedDept, academicYear],
+        queryFn: () => getScientificWorks(selectedDept, academicYear),
+        enabled: !!selectedDept,
+    })
+    // Керівництво дипломними роботами (бакалавр/магістр) — навчальне навантаження,
+    // тож враховуємо його у фонді/семестровому розподілі поряд з дисциплінами
+    const deptTeachingWorks = useMemo(() => deptWorks.filter(w => isTeachingWorkType(w.work_type)), [deptWorks])
+
     // Фонд навчального навантаження кафедри: сума лімітів усіх НПП
     // (частка навч. роботи за посадою × службовий час за категорією × ставка)
     const fund = useMemo(() => {
         const available = staff.reduce((sum, s) => sum + getTeachingLoadLimit(s, settings), 0)
-        const allocated = Math.round(deptAssignments.reduce((sum, a) => sum + a.hours, 0) * 100) / 100
+        const assignmentHours = deptAssignments.reduce((sum, a) => sum + a.hours, 0)
+        const thesisHours = deptTeachingWorks.reduce((sum, w) => sum + w.hours, 0)
+        const allocated = Math.round((assignmentHours + thesisHours) * 100) / 100
         const remaining = Math.round((available - allocated) * 100) / 100
         const usedPct = available > 0 ? Math.min(Math.round((allocated / available) * 100), 100) : 0
         return { available, allocated, remaining, usedPct, overloaded: allocated > available }
-    }, [staff, deptAssignments, settings])
+    }, [staff, deptAssignments, deptTeachingWorks, settings])
 
-    // Години кожного НПП по семестрах (навчальне навантаження за призначеннями)
+    // Години кожного НПП по семестрах (навчальне навантаження за призначеннями
+    // + керівництво дипломними роботами, прив'язане до фіксованого семестру захисту)
     const staffHours = useMemo(() => {
         const discSem = new Map(allDisciplines.map(d => [d.id, d.semester]))
         const map: Record<string, { sem1: number; sem2: number; total: number }> = {}
@@ -133,13 +145,20 @@ export default function StaffPage() {
             else if (sem && sem % 2 === 0) row.sem2 += a.hours
             row.total += a.hours
         }
+        for (const w of deptTeachingWorks) {
+            const row = map[w.staff_id] ?? (map[w.staff_id] = { sem1: 0, sem2: 0, total: 0 })
+            const sem = THESIS_SEMESTER[w.work_type]
+            if (sem === 1) row.sem1 += w.hours
+            else if (sem === 2) row.sem2 += w.hours
+            row.total += w.hours
+        }
         for (const k in map) {
             map[k].sem1 = Math.round(map[k].sem1 * 100) / 100
             map[k].sem2 = Math.round(map[k].sem2 * 100) / 100
             map[k].total = Math.round(map[k].total * 100) / 100
         }
         return map
-    }, [deptAssignments, allDisciplines])
+    }, [deptAssignments, deptTeachingWorks, allDisciplines])
 
     const invStaff = () => queryClient.invalidateQueries({ queryKey: ['staff', selectedDept] })
 

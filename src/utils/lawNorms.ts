@@ -114,6 +114,15 @@ export const TEACHING_SCIENTIFIC_WORK_TYPES: ScientificWorkType[] = ['bachelor_t
 export const isTeachingWorkType = (type: ScientificWorkType): boolean =>
     TEACHING_SCIENTIFIC_WORK_TYPES.includes(type)
 
+// scientific_works-записи не прив'язані до дисципліни/семестру напряму — захист
+// відбувається у фіксований семестр навчального року: магістерські роботи — 1-й
+// семестр (осінь), бакалаврські — 2-й семестр (весна). Ад'юнкт/докторант — наукове
+// навантаження на весь рік, без прив'язки до семестру.
+export const THESIS_SEMESTER: Partial<Record<ScientificWorkType, 1 | 2>> = {
+    master_thesis: 1,
+    bachelor_thesis: 2,
+}
+
 export type DiplomaMentoringHours = Record<ScientificWorkType, number>
 
 export const DEFAULT_DIPLOMA_MENTORING_HOURS: DiplomaMentoringHours = {
