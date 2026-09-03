@@ -5,6 +5,7 @@ import { getDepartments } from '../services/departments'
 import { getStaff } from '../services/staff'
 import { getDisciplines } from '../services/disciplines'
 import { getDetailedAssignments } from '../services/workloadAssignments'
+import { getAllScientificWorks } from '../services/scientificWorks'
 import { getDisciplineStatus } from '../utils/workload'
 import { Users, BookOpen, Clock, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
@@ -47,14 +48,24 @@ export default function DashboardPage() {
         enabled: discIds.length > 0,
     })
 
-    // Staff hours
+    // Керівництво здобувачами (дипломники + ад'юнкти/докторанти) — не з workload_assignments,
+    // тож без цього запиту навантаження НПП з керівництвом занижене
+    const { data: allWorks = [] } = useQuery({
+        queryKey: ['scientific-works-all', academicYear],
+        queryFn: () => getAllScientificWorks(academicYear),
+    })
+
+    // Staff hours (аудиторне навантаження + керівництво здобувачами)
     const staffHoursMap = useMemo(() => {
         const map: Record<string, number> = {}
         for (const a of allAssignments) {
             map[a.staff_id] = Math.round(((map[a.staff_id] || 0) + a.hours) * 100) / 100
         }
+        for (const w of allWorks) {
+            map[w.staff_id] = Math.round(((map[w.staff_id] || 0) + w.hours) * 100) / 100
+        }
         return map
-    }, [allAssignments])
+    }, [allAssignments, allWorks])
 
     // Discipline statuses
     const discStatuses = useMemo(() => {

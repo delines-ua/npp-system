@@ -23,6 +23,18 @@ export const getScientificWorks = async (
     return data || []
 }
 
+// Усі записи керівництва здобувачами за рік, без прив'язки до кафедри —
+// для загальних зведень (Дашборд), що охоплюють всі кафедри одразу.
+export const getAllScientificWorks = async (academicYear: string): Promise<ScientificWork[]> => {
+    const { data, error } = await supabase
+        .from('scientific_works')
+        .select('*')
+        .eq('academic_year', academicYear)
+        .order('created_at')
+    if (error) throw error
+    return data || []
+}
+
 export const getScientificWorksByStaff = async (
     staffId: string,
     academicYear: string
