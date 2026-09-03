@@ -8,7 +8,7 @@ import { getAssignmentsByStaff, getAssignmentsByStaffIds } from '../services/wor
 import { getScientificWorksByStaff } from '../services/scientificWorks'
 import { getTeachingLoadLimit, getWorkloadCeiling } from '../utils/workload'
 import { useSettings } from '../contexts/SettingsContext'
-import { WORKLOAD_TYPE_META, getScientificWorkTypes } from '../utils/lawNorms'
+import { WORKLOAD_TYPE_META, getScientificWorkTypes, isTeachingWorkType } from '../utils/lawNorms'
 import NumberInput from '../components/NumberInput'
 import type { Staff } from '../types/database'
 import { Users, Plus, Trash2, X, Save, Shield, User, Edit2, BookOpen, ChevronUp, Gauge, Search, GraduationCap, ArrowLeft } from 'lucide-react'
@@ -195,9 +195,17 @@ export default function StaffPage() {
         return Object.values(map).sort((a, b) => a.semester - b.semester || a.name.localeCompare(b.name))
     }, [staffAssignments, allDisciplines])
 
-    // Навчальне навантаження (workload_assignments) та наукове керівництво (scientific_works)
-    const teachingHours = useMemo(() => Math.round(staffAssignments.reduce((s, a) => s + a.hours, 0) * 100) / 100, [staffAssignments])
-    const scientificHours = useMemo(() => Math.round(staffWorks.reduce((s, w) => s + w.hours, 0) * 100) / 100, [staffWorks])
+    // Навчальне навантаження (workload_assignments + керівництво дипломними роботами
+    // бакалавра/магістра) та наукове навантаження (керівництво ад'юнктом/докторантом) —
+    // дипломне керівництво це не наука, а навчальна робота (Наказ №155/291, Табл.3)
+    const teachingHours = useMemo(() => {
+        const assignmentHours = staffAssignments.reduce((s, a) => s + a.hours, 0)
+        const thesisHours = staffWorks.filter(w => isTeachingWorkType(w.work_type)).reduce((s, w) => s + w.hours, 0)
+        return Math.round((assignmentHours + thesisHours) * 100) / 100
+    }, [staffAssignments, staffWorks])
+    const scientificHours = useMemo(() =>
+        Math.round(staffWorks.filter(w => !isTeachingWorkType(w.work_type)).reduce((s, w) => s + w.hours, 0) * 100) / 100,
+    [staffWorks])
     const totalHours = Math.round((teachingHours + scientificHours) * 100) / 100
     // Стеля навантаження: ручний ліміт (460/550) у режимі override, інакше річний службовий час (1840 і т.д.)
     const staffLimit = selectedStaff ? getWorkloadCeiling(selectedStaff, settings) : THRESHOLD
@@ -550,22 +558,30 @@ export default function StaffPage() {
                             </div>
                         </div>
 
-                        {/* Scientific supervision card */}
+                        {/* Керівництво здобувачами: дипломники (навчальне) + ад'юнкти/докторанти (наукове) */}
                         {staffWorks.length > 0 && (
                             <div style={{ ...card, overflow: 'hidden' }}>
                                 <div style={{ padding: '14px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <GraduationCap size={14} color="#9ca3af" />
                                     <span style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Наукове керівництво
+                                        Керівництво здобувачами
                                     </span>
                                 </div>
                                 <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     {staffWorks.map(w => {
                                         const meta = scientificWorkTypes[w.work_type]
+                                        // Показуємо норму, застосовану ФАКТИЧНО (на момент створення запису),
+                                        // а не поточну з Налаштувань — вони можуть розійтись після зміни норми.
+                                        const appliedRate = w.student_count > 0 ? Math.round((w.hours / w.student_count) * 100) / 100 : meta?.hours
                                         return (
                                             <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                                                <span style={{ fontSize: '13px', fontWeight: '600', color: meta?.color ?? '#374151' }}>{meta?.label ?? w.work_type}</span>
-                                                <span style={{ fontSize: '12px', color: '#9ca3af' }}>{w.student_count} ос. × {meta?.hours}г = <b style={{ color: '#374151' }}>{w.hours}г</b></span>
+                                                <span style={{ fontSize: '13px', fontWeight: '600', color: meta?.color ?? '#374151' }}>
+                                                    {meta?.label ?? w.work_type}
+                                                    <span style={{ fontSize: '10px', fontWeight: '500', color: '#9ca3af', marginLeft: '6px' }}>
+                                                        {isTeachingWorkType(w.work_type) ? '· навчальна' : '· наукова'}
+                                                    </span>
+                                                </span>
+                                                <span style={{ fontSize: '12px', color: '#9ca3af' }}>{w.student_count} ос. × {appliedRate}г = <b style={{ color: '#374151' }}>{w.hours}г</b></span>
                                             </div>
                                         )
                                     })}

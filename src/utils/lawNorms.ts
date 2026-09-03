@@ -107,6 +107,13 @@ export const SCIENTIFIC_WORK_META = {
 
 export type ScientificWorkType = keyof typeof SCIENTIFIC_WORK_META
 
+// Керівництво дипломними роботами (бакалавр/магістр) — це навчальне навантаження
+// (Наказ №155/291, Табл.3), не наукова робота. Науковим є лише керівництво
+// здобувачами наукового ступеня (ад'юнкт/докторант).
+export const TEACHING_SCIENTIFIC_WORK_TYPES: ScientificWorkType[] = ['bachelor_thesis', 'master_thesis']
+export const isTeachingWorkType = (type: ScientificWorkType): boolean =>
+    TEACHING_SCIENTIFIC_WORK_TYPES.includes(type)
+
 export type DiplomaMentoringHours = Record<ScientificWorkType, number>
 
 export const DEFAULT_DIPLOMA_MENTORING_HOURS: DiplomaMentoringHours = {

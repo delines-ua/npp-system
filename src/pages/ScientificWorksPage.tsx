@@ -173,6 +173,9 @@ export default function ScientificWorksPage() {
                                         <div style={{ padding: '10px 20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                             {staffWorks.map(w => {
                                                 const meta = scientificWorkTypes[w.work_type]
+                                                // Норма застосована ФАКТИЧНО при створенні запису, а не поточна
+                                                // з Налаштувань — вони можуть розійтись після зміни норми.
+                                                const appliedRate = w.student_count > 0 ? Math.round((w.hours / w.student_count) * 100) / 100 : meta.hours
                                                 return (
                                                     <div key={w.id} style={{
                                                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -183,7 +186,7 @@ export default function ScientificWorksPage() {
                                                                 {meta.label}
                                                             </span>
                                                             <span style={{ fontSize: '12px', color: '#9ca3af' }}>
-                                                                {w.student_count} {w.student_count === 1 ? 'особа' : 'особи'} × {meta.hours}г = {w.hours}г
+                                                                {w.student_count} {w.student_count === 1 ? 'особа' : 'особи'} × {appliedRate}г = {w.hours}г
                                                             </span>
                                                             {w.notes && <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '8px' }}>{w.notes}</span>}
                                                         </div>
