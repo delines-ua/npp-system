@@ -2,6 +2,8 @@
 // Дозволяє планувальнику тимчасово перевизначати норми Наказу 155/291
 // (режим "override"), не видаляючи регуляторну логіку (режим "regulatory").
 
+import { DEFAULT_DIPLOMA_MENTORING_HOURS, type DiplomaMentoringHours } from './lawNorms'
+
 export type WorkloadMode = 'regulatory' | 'override'
 
 export interface WorkloadSettings {
@@ -10,12 +12,16 @@ export interface WorkloadSettings {
     mode: WorkloadMode
     overrideCivilian: number   // год/ставка для цивільних
     overrideMilitary: number   // год/ставка для військовослужбовців
+    // Керівництво дипломниками: години за 1 особу для бакалаврської/магістерської
+    // роботи та наукового керівництва ад'юнктом/докторантом
+    diplomaMentoringHours: DiplomaMentoringHours
 }
 
 export const DEFAULT_WORKLOAD_SETTINGS: WorkloadSettings = {
     mode: 'override',
     overrideCivilian: 460,
     overrideMilitary: 550,
+    diplomaMentoringHours: DEFAULT_DIPLOMA_MENTORING_HOURS,
 }
 
 // ─── Обраний навчальний рік (глобальний для UI) ──────────────────────────────
@@ -46,7 +52,12 @@ export const loadSettings = (): WorkloadSettings => {
     try {
         const raw = localStorage.getItem(STORAGE_KEY)
         if (!raw) return DEFAULT_WORKLOAD_SETTINGS
-        return { ...DEFAULT_WORKLOAD_SETTINGS, ...JSON.parse(raw) }
+        const parsed = JSON.parse(raw)
+        return {
+            ...DEFAULT_WORKLOAD_SETTINGS,
+            ...parsed,
+            diplomaMentoringHours: { ...DEFAULT_DIPLOMA_MENTORING_HOURS, ...parsed.diplomaMentoringHours },
+        }
     } catch {
         return DEFAULT_WORKLOAD_SETTINGS
     }

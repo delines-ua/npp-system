@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSettings } from '../contexts/SettingsContext'
 import { DEFAULT_WORKLOAD_SETTINGS, type WorkloadSettings } from '../utils/settings'
+import { SCIENTIFIC_WORK_META, type ScientificWorkType } from '../utils/lawNorms'
 import { resetWorkloadAssignments } from '../services/workloadAssignments'
 import { resetInstituteGroups } from '../services/instituteGroups'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 import NumberInput from '../components/NumberInput'
-import { Settings as SettingsIcon, Save, RotateCcw, Check, ShieldAlert, Trash2, Layers, ClipboardList } from 'lucide-react'
+import { Settings as SettingsIcon, Save, RotateCcw, Check, ShieldAlert, Trash2, Layers, ClipboardList, GraduationCap } from 'lucide-react'
 
 const card: React.CSSProperties = {
     background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '16px',
@@ -58,6 +59,9 @@ export default function SettingsPage() {
             ...draft,
             overrideCivilian: Math.max(0, Math.round(draft.overrideCivilian)),
             overrideMilitary: Math.max(0, Math.round(draft.overrideMilitary)),
+            diplomaMentoringHours: Object.fromEntries(
+                Object.entries(draft.diplomaMentoringHours).map(([k, v]) => [k, Math.max(0, v)])
+            ) as WorkloadSettings['diplomaMentoringHours'],
         })
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
@@ -149,6 +153,29 @@ export default function SettingsPage() {
                             <Check size={16} /> Збережено
                         </span>
                     )}
+                </div>
+            </div>
+
+            <div style={{ ...card, padding: '24px', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <GraduationCap size={16} color="#6b7280" /> Керівництво дипломниками
+                </h3>
+                <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '16px' }}>
+                    Норма годин на 1 особу для бакалаврської/магістерської роботи та наукового керівництва (Наказ №155/291, Табл.3 — типові значення, редаговані)
+                </p>
+
+                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                    {(Object.keys(SCIENTIFIC_WORK_META) as ScientificWorkType[]).map(key => (
+                        <div key={key}>
+                            <label style={lbl}>{SCIENTIFIC_WORK_META[key].label} (год/особа)</label>
+                            <NumberInput min={0} style={inputStyle}
+                                value={draft.diplomaMentoringHours[key]}
+                                onChange={v => setDraft({
+                                    ...draft,
+                                    diplomaMentoringHours: { ...draft.diplomaMentoringHours, [key]: v },
+                                })} />
+                        </div>
+                    ))}
                 </div>
             </div>
 

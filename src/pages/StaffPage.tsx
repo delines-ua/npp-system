@@ -8,7 +8,7 @@ import { getAssignmentsByStaff, getAssignmentsByStaffIds } from '../services/wor
 import { getScientificWorksByStaff } from '../services/scientificWorks'
 import { getTeachingLoadLimit, getWorkloadCeiling } from '../utils/workload'
 import { useSettings } from '../contexts/SettingsContext'
-import { WORKLOAD_TYPE_META, SCIENTIFIC_WORK_TYPES } from '../utils/lawNorms'
+import { WORKLOAD_TYPE_META, getScientificWorkTypes } from '../utils/lawNorms'
 import NumberInput from '../components/NumberInput'
 import type { Staff } from '../types/database'
 import { Users, Plus, Trash2, X, Save, Shield, User, Edit2, BookOpen, ChevronUp, Gauge, Search, GraduationCap, ArrowLeft } from 'lucide-react'
@@ -49,6 +49,7 @@ export default function StaffPage() {
     const queryClient = useQueryClient()
     const navigate = useNavigate()
     const { settings, academicYear } = useSettings()
+    const scientificWorkTypes = useMemo(() => getScientificWorkTypes(settings.diplomaMentoringHours), [settings.diplomaMentoringHours])
     const [searchParams, setSearchParams] = useSearchParams()
     // Перехід із іншої сторінки з ?staff=<id> — одразу відкриваємо картку НПП
     const staffParam = searchParams.get('staff')
@@ -560,7 +561,7 @@ export default function StaffPage() {
                                 </div>
                                 <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     {staffWorks.map(w => {
-                                        const meta = SCIENTIFIC_WORK_TYPES[w.work_type]
+                                        const meta = scientificWorkTypes[w.work_type]
                                         return (
                                             <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
                                                 <span style={{ fontSize: '13px', fontWeight: '600', color: meta?.color ?? '#374151' }}>{meta?.label ?? w.work_type}</span>

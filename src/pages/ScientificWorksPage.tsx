@@ -7,7 +7,7 @@ import { getDetailedAssignments } from '../services/workloadAssignments'
 import { getDisciplines } from '../services/disciplines'
 import { getWorkloadCeiling, buildStaffHoursMap } from '../utils/workload'
 import { useSettings } from '../contexts/SettingsContext'
-import { SCIENTIFIC_WORK_TYPES } from '../utils/lawNorms'
+import { getScientificWorkTypes } from '../utils/lawNorms'
 import type { ScientificWorkType } from '../utils/lawNorms'
 import { GraduationCap, Plus, Trash2, AlertTriangle } from 'lucide-react'
 import Select from '../components/Select'
@@ -29,6 +29,8 @@ export default function ScientificWorksPage() {
     const [addForm, setAddForm] = useState<{ staffId: string; type: ScientificWorkType; count: string; notes: string }>({
         staffId: '', type: 'bachelor_thesis', count: '', notes: '',
     })
+
+    const scientificWorkTypes = useMemo(() => getScientificWorkTypes(settings.diplomaMentoringHours), [settings.diplomaMentoringHours])
 
     const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: getDepartments })
     useEffect(() => {
@@ -69,7 +71,8 @@ export default function ScientificWorksPage() {
     const createMutation = useMutation({
         mutationFn: () => createScientificWork(
             addForm.staffId, selectedDept, addForm.type,
-            Number(addForm.count), addForm.notes, ACADEMIC_YEAR
+            Number(addForm.count), addForm.notes, ACADEMIC_YEAR,
+            scientificWorkTypes[addForm.type].hours
         ),
         onSuccess: () => {
             inv()
@@ -99,10 +102,10 @@ export default function ScientificWorksPage() {
     }, [works])
 
     const hoursPreview = addForm.count
-        ? Math.round(SCIENTIFIC_WORK_TYPES[addForm.type].hours * Number(addForm.count) * 10) / 10
+        ? Math.round(scientificWorkTypes[addForm.type].hours * Number(addForm.count) * 10) / 10
         : 0
 
-    const workTypeKeys = Object.keys(SCIENTIFIC_WORK_TYPES) as ScientificWorkType[]
+    const workTypeKeys = Object.keys(scientificWorkTypes) as ScientificWorkType[]
 
     return (
         <div>
@@ -169,7 +172,7 @@ export default function ScientificWorksPage() {
                                     {staffWorks.length > 0 ? (
                                         <div style={{ padding: '10px 20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                             {staffWorks.map(w => {
-                                                const meta = SCIENTIFIC_WORK_TYPES[w.work_type]
+                                                const meta = scientificWorkTypes[w.work_type]
                                                 return (
                                                     <div key={w.id} style={{
                                                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -233,13 +236,13 @@ export default function ScientificWorksPage() {
                                     <Select
                                         value={addForm.type}
                                         onChange={v => setAddForm(f => ({ ...f, type: v as ScientificWorkType }))}
-                                        options={workTypeKeys.map(k => ({ value: k, label: `${SCIENTIFIC_WORK_TYPES[k].label} (${SCIENTIFIC_WORK_TYPES[k].hours}г/особа)` }))}
+                                        options={workTypeKeys.map(k => ({ value: k, label: `${scientificWorkTypes[k].label} (${scientificWorkTypes[k].hours}г/особа)` }))}
                                     />
                                 </div>
 
                                 {/* Norm hint */}
                                 <div style={{ padding: '8px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '12px', color: '#16a34a' }}>
-                                    Норма: <strong>{SCIENTIFIC_WORK_TYPES[addForm.type].hours}</strong> год/особа
+                                    Норма: <strong>{scientificWorkTypes[addForm.type].hours}</strong> год/особа
                                     {' · '}Наказ №155/291, Табл.3
                                 </div>
 
@@ -255,7 +258,7 @@ export default function ScientificWorksPage() {
                                     <div style={{ padding: '10px 14px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <span style={{ fontSize: '13px', color: '#f97316' }}>Розрахунок:</span>
                                         <span style={{ fontSize: '17px', fontWeight: '700', color: '#f97316' }}>
-                                            {addForm.count} × {SCIENTIFIC_WORK_TYPES[addForm.type].hours} = <strong>{hoursPreview}</strong> год
+                                            {addForm.count} × {scientificWorkTypes[addForm.type].hours} = <strong>{hoursPreview}</strong> год
                                         </span>
                                     </div>
                                 )}
@@ -292,7 +295,7 @@ export default function ScientificWorksPage() {
                             </div>
                             <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 {workTypeKeys.map(k => {
-                                    const meta = SCIENTIFIC_WORK_TYPES[k]
+                                    const meta = scientificWorkTypes[k]
                                     return (
                                         <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                                             <span style={{ color: '#374151' }}>{meta.label}</span>

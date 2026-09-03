@@ -1,7 +1,6 @@
 import { supabase } from './supabase'
 import type { ScientificWork } from '../types/database'
 import type { ScientificWorkType } from '../utils/lawNorms'
-import { SCIENTIFIC_WORK_TYPES } from '../utils/lawNorms'
 
 export const getScientificWorks = async (
     departmentId: string,
@@ -44,10 +43,10 @@ export const createScientificWork = async (
     workType: ScientificWorkType,
     studentCount: number,
     notes: string,
-    academicYear: string
+    academicYear: string,
+    hoursPerStudent: number
 ): Promise<ScientificWork> => {
-    const meta = SCIENTIFIC_WORK_TYPES[workType]
-    const hours = Math.round(meta.hours * studentCount * 10) / 10
+    const hours = Math.round(hoursPerStudent * studentCount * 10) / 10
 
     const { data, error } = await supabase
         .from('scientific_works')
@@ -70,10 +69,9 @@ export const updateScientificWork = async (
     id: string,
     studentCount: number,
     notes: string,
-    workType: ScientificWorkType
+    hoursPerStudent: number
 ): Promise<void> => {
-    const meta = SCIENTIFIC_WORK_TYPES[workType]
-    const hours = Math.round(meta.hours * studentCount * 10) / 10
+    const hours = Math.round(hoursPerStudent * studentCount * 10) / 10
 
     const { error } = await supabase
         .from('scientific_works')

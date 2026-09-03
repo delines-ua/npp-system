@@ -47,12 +47,9 @@ export const TIME_NORMS = {
     stateExam:     { hoursPerStudent: 0.5, complexHoursPerStudent: 0.75 },
     thesisDefense: { hoursPerWork: 1 },
 
-    // Дипломні роботи
-    bachelorThesis:  { hoursPerStudent: 30 },  // кваліфікаційна робота бакалавра
-    masterThesis:    { hoursPerStudent: 60 },  // кваліфікаційна робота магістра
-
-    // Наукове керівництво (Табл.3, ВВНЗ III-IV)
-    graduateMentoring:{ hoursPerStudentPerYear: 50 }, // ад'юнкт/докторант — 50 год/рік
+    // Дипломні роботи та наукове керівництво (Табл.3, ВВНЗ III-IV) —
+    // фактичні норми годин налаштовуються на сторінці «Налаштування»,
+    // див. SCIENTIFIC_WORK_META / getScientificWorkTypes нижче.
 
     // Вступні іспити
     entranceOral:    { hoursPerCandidate: 0.25 },
@@ -99,10 +96,29 @@ export const EDUCATION_LEVELS = [
 ] as const
 
 // ─── Типи керівництва здобувачами ─────────────────────────────────────────────
-export const SCIENTIFIC_WORK_TYPES = {
-    bachelor_thesis:   { label: 'Бакалаврська робота',  hours: 30, color: '#06b6d4' },
-    master_thesis:     { label: 'Магістерська робота',  hours: 60, color: '#ec4899' },
-    graduate_mentoring:{ label: "Ад'юнкт / Докторант", hours: 50, color: '#22c55e' },
+// Години за одиницю є типовими нормами (Наказ №155/291, Табл.3) і слугують
+// значеннями за замовчуванням — фактичні значення налаштовуються на сторінці
+// «Налаштування» (див. WorkloadSettings.diplomaMentoringHours) і мають пріоритет.
+export const SCIENTIFIC_WORK_META = {
+    bachelor_thesis:    { label: 'Бакалаврська робота',  defaultHours: 30, color: '#06b6d4' },
+    master_thesis:      { label: 'Магістерська робота',  defaultHours: 60, color: '#ec4899' },
+    graduate_mentoring: { label: "Ад'юнкт / Докторант",  defaultHours: 50, color: '#22c55e' },
 } as const
 
-export type ScientificWorkType = keyof typeof SCIENTIFIC_WORK_TYPES
+export type ScientificWorkType = keyof typeof SCIENTIFIC_WORK_META
+
+export type DiplomaMentoringHours = Record<ScientificWorkType, number>
+
+export const DEFAULT_DIPLOMA_MENTORING_HOURS: DiplomaMentoringHours = {
+    bachelor_thesis: SCIENTIFIC_WORK_META.bachelor_thesis.defaultHours,
+    master_thesis: SCIENTIFIC_WORK_META.master_thesis.defaultHours,
+    graduate_mentoring: SCIENTIFIC_WORK_META.graduate_mentoring.defaultHours,
+}
+
+// Об'єднує метадані (назва/колір) з поточними (можливо, переналаштованими)
+// нормами годин, щоб компоненти могли й далі читати .hours як раніше.
+export const getScientificWorkTypes = (hours: DiplomaMentoringHours) => ({
+    bachelor_thesis:    { ...SCIENTIFIC_WORK_META.bachelor_thesis,    hours: hours.bachelor_thesis },
+    master_thesis:      { ...SCIENTIFIC_WORK_META.master_thesis,      hours: hours.master_thesis },
+    graduate_mentoring: { ...SCIENTIFIC_WORK_META.graduate_mentoring, hours: hours.graduate_mentoring },
+}) satisfies Record<ScientificWorkType, { label: string; defaultHours: number; color: string; hours: number }>
